@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -14,8 +16,8 @@ android {
         applicationId = "ru.maxgog.pageru"
         minSdk = 28
         targetSdk = 36
-        versionCode = 5
-        versionName = "2.0"
+        versionCode = 6
+        versionName = "2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -45,10 +47,16 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file("keystore.jks")
-            storePassword = "2404Bhbyf1975"
-            keyAlias = "upload"
-            keyPassword = "2404Bhbyf1975"
+            val keystorePropertiesFile = rootProject.file("local.properties")
+            val keystoreProperties = Properties()
+            if (keystorePropertiesFile.exists()) {
+                keystoreProperties.load(keystorePropertiesFile.inputStream())
+            }
+
+            storeFile = file(keystoreProperties.getProperty("RELEASE_STORE_FILE") ?: "keystore.jks")
+            storePassword = keystoreProperties.getProperty("RELEASE_STORE_PASSWORD")
+            keyAlias = keystoreProperties.getProperty("RELEASE_KEY_ALIAS")
+            keyPassword = keystoreProperties.getProperty("RELEASE_KEY_PASSWORD")
         }
     }
 
@@ -64,8 +72,8 @@ android {
         }
     }
 
-    buildToolsVersion = "36.0.0"
-    ndkVersion = "27.0.12077973"
+    buildToolsVersion = "37.0.0"
+    ndkVersion = "28.2.13676358"
 }
 
 dependencies {

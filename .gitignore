@@ -89,3 +89,5 @@ Desktop.ini
 **/build-cache/
 
 *.jks
+
+keystore.jks
