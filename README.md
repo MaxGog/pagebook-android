@@ -5,18 +5,24 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.0-blue.svg)](https://kotlinlang.org)
 [![Compose](https://img.shields.io/badge/Jetpack%20Compose-1.5-blue.svg)](https://developer.android.com/jetpack/compose)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.1.0-orange.svg)](CHANGELOG.md)
 
 ## 🌟 О проекте
 
-PageBook - это нативное Android-приложение для работы со справочными материалами, заметками, задачами и календарем. Часть кроссплатформенного проекта PageBook, разрабатываемого нативно для обеих платформ.
+PageBook — это нативное Android-приложение для работы со справочными материалами, заметками, задачами и календарём. Часть кроссплатформенного проекта PageBook, разрабатываемого нативно для обеих платформ.
 
 > 📖 **iOS версия**: [PageBook iOS](https://github.com/MaxGog/PageBook-ios)
+
+## 📖 Документация
+
+- **[Архитектура](docs/ARCHITECTURE.md)** — подробное описание слоёв, потока данных и технических решений.
+- **[Участие в разработке](docs/CONTRIBUTING.md)** — как настроить окружение, стиль кода и процесс Pull Request.
+- **[История изменений](docs/CHANGELOG.md)** — что нового в каждой версии.
 
 ## ✨ Основные возможности
 
 ### 📝 Умные заметки
-- Создание и редактирование с поддержкой форматирования 🎨
-- Организация по категориям и тегам 🏷️
+- Создание и редактирование заметок
 - Быстрый поиск и фильтрация
 
 ### ✅ Менеджер задач
@@ -31,12 +37,12 @@ PageBook - это нативное Android-приложение для рабо�
 
 ## 🛠 Технологический стек
 
-- **💚 100% Kotlin** - современный и выразительный код
-- **🎨 Jetpack Compose** - декларативный UI будущего
-- **💾 Room Database** - надежное локальное хранение
-- **🔄 Coroutines & Flow** - реактивное программирование
-- **🗂️ Hilt** - dependency injection
-- **📐 Material Design 3** - современные UI компоненты
+- **💚 100% Kotlin** — современный и выразительный код
+- **🎨 Jetpack Compose** — декларативный UI
+- **💾 Room Database** — надёжное локальное хранение
+- **🔄 Coroutines & Flow** — реактивное программирование
+- **🧩 Ручной DI** — внедрение зависимостей через `PageBookApplication` (пока без Hilt)
+- **📐 Material Design 3** — современные UI-компоненты
 
 ## 🏗 Архитектура
 
@@ -46,16 +52,18 @@ graph TD
     B --> C[Repository Layer]
     C --> D[Local Data - Room]
     C --> E[Remote Data - Future]
-    
+
     style A fill:#e1f5fe
     style B fill:#f3e5f5
     style C fill:#e8f5e8
 ```
 
-### Чистая архитектура с MVVM
+### MVVM + Repository
 - **UI Layer**: Jetpack Compose + ViewModel
-- **Domain Layer**: Use Cases & Business Logic  
-- **Data Layer**: Repository pattern with Room
+- **Data Layer**: Repository pattern + Room
+- **Domain Layer**: _Планируется_ (Use Cases пока отсутствуют)
+
+Подробнее см. в [ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## 🚀 Быстрый старт
 
@@ -77,36 +85,31 @@ graph TD
    - Дождитесь завершения сборки зависимостей
 
 3. **Запустите приложение**
-   - Подключите Android устройство или запустите эмулятор
+   - Подключите Android-устройство или запустите эмулятор
    - Нажмите ▶️ Run или `Ctrl + R`
 
 ## 📁 Структура проекта
 
 ```
-app/
-├── src/main/
-│   ├── java/com/pagebook/
-│   │   ├── ui/              # Compose UI компоненты
-│   │   │   ├── screens/     # Экраны приложения
-│   │   │   ├── components/  # Переиспользуемые UI компоненты
-│   │   │   └── theme/       # Тема и стили Material Design
-│   │   ├── repositories/    # Репозитории
-│   │   ├── database/        # Room database и DAO
-│   │   ├── models/          # Data модели
-│   │   ├── models/          # Domain модели
-│   │   └── utils/           # Утилиты и extensions
-│   └── res/                 # Ресурсы
-│       ├── drawable/        # Иконки и изображения
-│       └── values/          # Colors, strings, themes
+app/src/main/java/ru/maxgog/pagebook/
+├── ui/
+│   ├── app/            # CombinedApp — навигация и корневой Composable
+│   └── theme/          # Тема Material 3
+├── models/             # Room-сущности (NoteModel, TodoModel, EventModel)
+├── dao/                # DAO-интерфейсы
+├── rooms/              # RoomDatabase (Singleton для каждой БД)
+├── repositories/       # Репозитории
+├── PageBookApplication.kt
+└── MainActivity.kt
 ```
 
-## 🧩 Основные модули
+## 🧩 Функциональные возможности
 
-| Модуль | Описание | Технологии |
-|--------|----------|------------|
-| **notes** | Управление заметками 📝 | Compose, Room, ViewModel |
-| **tasks** | To-do листы и задачи ✅ | Compose, StateFlow, Room |
-| **calendar** | Планирование и события 🗓️ | Compose, Date Picker |
+| Возможность | Описание                  | Технологии               |
+|-------------|---------------------------|--------------------------|
+| **Notes**   | Управление заметками 📝   | Compose, Room, ViewModel |
+| **Todos**   | To-do листы и задачи ✅   | Compose, StateFlow, Room |
+| **Events**  | Планирование и события 🗓️ | Compose, Date Picker     |
 
 ## 🛠 Разработка
 
@@ -125,36 +128,25 @@ app/
 ./gradlew ktlintCheck
 ```
 
+Полный гайд по настройке окружения и процессу PR — в [CONTRIBUTING.md](docs/CONTRIBUTING.md).
+
 ## 🤝 Участие в разработке
 
-Мы рады контрибьюторам! Вот как вы можете помочь:
+Мы рады контрибьюторам! Кратко:
 
-### 🐛 Сообщение о багах
-- Используйте [Issues](https://github.com/MaxGog/PageBook-android/issues)
-- Опишите шаги для воспроизведения
-- Укажите версию ОС и устройства
-
-### 💡 Предложение улучшений
-- Откройте Issue с меткой `enhancement`
-- Опишите проблему и предлагаемое решение
-
-### 🔧 Pull Requests
-1. Форкните репозиторий
-2. Создайте feature branch (`git checkout -b feature/amazing-feature`)
-3. Сделайте коммит изменений (`git commit -m 'Add amazing feature'`)
-4. Запушьте branch (`git push origin feature/amazing-feature`)
-5. Откройте Pull Request
-
-### 🏷️ Good First Issues
-Начните с задач, помеченных `good first issue` - они идеальны для новичков!
+- **🐛 Баги** — создайте [Issue](https://github.com/MaxGog/PageBook-android/issues) с шагами воспроизведения.
+- **💡 Идеи** — откройте Issue с меткой `enhancement`.
+- **🔧 Pull Requests** — следуйте процессу из [CONTRIBUTING.md](docs/CONTRIBUTING.md).
+- **🏷️ Good First Issues** — начните с задач с этой меткой.
 
 ## 🎯 Планы развития
 
 - [ ] **Синхронизация с облаком** ☁️
-- [ ] **Темная тема** 🌙  
+- [ ] **Тёмная тема** 🌙
 - [ ] **Виджеты для главного экрана** 🏠
 - [ ] **Резервное копирование** 💾
 - [ ] **Голосовые заметки** 🎤
+- [ ] **Kotlin Multiplatform** для общей бизнес-логики
 
 ## 📄 Лицензия
 
@@ -170,7 +162,3 @@ app/
 Есть вопросы или предложения? Не стесняйтесь:
 - Создать [Issue](https://github.com/MaxGog/PageBook-android/issues)
 - Написать в Discussions
-
----
-
-**⭐ Не забудьте поставить звезду репозиторию, если проект вам понравился!**
