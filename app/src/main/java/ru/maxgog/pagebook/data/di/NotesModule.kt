@@ -8,7 +8,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import ru.maxgog.pagebook.data.dao.NoteDao
-import ru.maxgog.pagebook.data.repositories.NotesRepository
+import ru.maxgog.pagebook.data.repositories.NoteRepository
 import ru.maxgog.pagebook.data.rooms.NoteRoomDatabase
 import javax.inject.Singleton
 
@@ -33,7 +33,7 @@ object NotesModule {
 
     @Provides
     @Singleton
-    fun provideNotesRepository(dao: NoteDao): NotesRepository {
-        return NotesRepository(dao)
+    fun provideNotesRepository(dao: NoteDao): NoteRepository {
+        return NoteRepository(dao)
     }
 }

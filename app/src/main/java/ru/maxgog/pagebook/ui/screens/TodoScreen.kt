@@ -32,7 +32,6 @@ import ru.maxgog.pagebook.viewmodels.TodoViewModel
 @Composable
 fun TodoScreen(
     viewModel: TodoViewModel = hiltViewModel(),
-    modifier: Modifier = Modifier
 ) {
     val todos by viewModel.allTodos.collectAsState(initial = emptyList())
     var showDialog by remember { mutableStateOf(false) }
@@ -44,7 +43,6 @@ fun TodoScreen(
 
     SetTransparentSystemBars()
     Scaffold(
-        modifier = modifier,
         topBar = {
             CenterAlignedTopAppBar(
                 modifier = Modifier.statusBarsPadding(),

@@ -5,22 +5,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import ru.maxgog.pagebook.ui.screens.CalendarScreen
+import ru.maxgog.pagebook.ui.screens.NoteEditScreen
 import ru.maxgog.pagebook.ui.screens.NotesScreen
+import ru.maxgog.pagebook.ui.screens.SettingsScreen
 import ru.maxgog.pagebook.ui.screens.TodoScreen
-import ru.maxgog.pagebook.viewmodels.CalendarViewModel
-import ru.maxgog.pagebook.viewmodels.NotesViewModel
-import ru.maxgog.pagebook.viewmodels.TodoViewModel
 
 @Composable
 fun AppNavHost(
     navController: NavHostController,
     paddingValues: PaddingValues,
-    notesViewModel: NotesViewModel,
-    todoViewModel: TodoViewModel,
-    calendarViewModel: CalendarViewModel,
     modifier: Modifier = Modifier
 ) {
     NavHost(
@@ -28,14 +26,36 @@ fun AppNavHost(
         startDestination = Screen.Todo.route,
         modifier = modifier.padding(paddingValues)
     ) {
-        composable(Screen.Todo.route) {
-            TodoScreen(viewModel = todoViewModel)
-        }
+        composable(Screen.Todo.route) { TodoScreen() }
+        composable(Screen.Calendar.route) { CalendarScreen() }
+
         composable(Screen.Notes.route) {
-            NotesScreen(viewModel = notesViewModel)
+            NotesScreen(
+                onNoteClick = { id -> navController.navigate(Routes.noteDetail(id)) },
+                onAddNote = { navController.navigate(Routes.NOTE_ADD) },
+                onSettingsClick = { navController.navigate(Routes.SETTINGS) }
+            )
         }
-        composable(Screen.Calendar.route) {
-            CalendarScreen(viewModel = calendarViewModel)
+
+        composable(Routes.NOTE_ADD) {
+            NoteEditScreen(
+                noteId = null,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Routes.NOTE_DETAIL,
+            arguments = listOf(navArgument(Routes.ARG_NOTE_ID) { type = NavType.IntType })
+        ) { entry ->
+            NoteEditScreen(
+                noteId = entry.arguments?.getInt(Routes.ARG_NOTE_ID),
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.SETTINGS) {
+            SettingsScreen(onBack = { navController.popBackStack() })
         }
     }
 }

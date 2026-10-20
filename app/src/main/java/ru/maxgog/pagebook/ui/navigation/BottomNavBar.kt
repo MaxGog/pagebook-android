@@ -16,10 +16,16 @@ fun BottomNavBar(navController: NavController) {
 
     NavigationBar {
         Screen.bottomNavItems.forEach { screen ->
+            val selected = currentRoute == screen.route
             NavigationBarItem(
-                icon = { Icon(screen.icon, stringResource(screen.labelResId)) },
+                icon = {
+                    Icon(
+                        imageVector = if (selected) screen.selectedIcon else screen.unselectedIcon,
+                        contentDescription = null
+                    )
+                },
                 label = { Text(stringResource(screen.labelResId)) },
-                selected = currentRoute == screen.route,
+                selected = selected,
                 onClick = {
                     navController.navigate(screen.route) {
                         popUpTo(navController.graph.findStartDestination().id) {

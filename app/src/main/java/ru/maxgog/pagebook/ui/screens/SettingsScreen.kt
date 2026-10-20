@@ -25,9 +25,8 @@ import java.util.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    navController: NavHostController
+    onBack: () -> Unit
 ) {
-    SetTransparentSystemBars()
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -38,7 +37,7 @@ fun SettingsScreen(
                     titleContentColor = MaterialTheme.colorScheme.onSurface
                 ),
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
+                    IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.back)
@@ -49,9 +48,7 @@ fun SettingsScreen(
         }
     ) { innerPadding ->
         SettingsContent(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
+            modifier = Modifier.fillMaxSize().padding(innerPadding)
         )
     }
 }

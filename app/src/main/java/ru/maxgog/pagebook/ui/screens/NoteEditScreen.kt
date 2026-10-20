@@ -3,41 +3,37 @@ package ru.maxgog.pagebook.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import ru.maxgog.pagebook.R
-import ru.maxgog.pagebook.data.models.NoteModel
-import ru.maxgog.pagebook.ui.theme.SetTransparentSystemBars
-import ru.maxgog.pagebook.viewmodels.NotesViewModel
+import ru.maxgog.pagebook.viewmodels.NoteEditViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NoteEditScreen(
-    note: NoteModel? = null,
-    viewModel: NotesViewModel,
+    noteId: Int?,
     onBack: () -> Unit,
-    modifier: Modifier = Modifier
+    viewModel: NoteEditViewModel = hiltViewModel()
 ) {
-    val isNewNote = note == null
+    val note by viewModel.note.collectAsState()
+    val isNewNote = viewModel.isNewNote
+    val isLoading = !isNewNote && note == null
+
     var titleState by remember(note?.id) {
         mutableStateOf(TextFieldValue(note?.title ?: ""))
     }
     var contentState by remember(note?.id) {
         mutableStateOf(TextFieldValue(note?.content ?: ""))
     }
-
-    val saveEnabled by remember {
-        derivedStateOf {
-            titleState.text.isNotBlank() && contentState.text.isNotBlank()
-        }
-    }
-
-    SetTransparentSystemBars()
+    val saveEnabled = titleState.text.isNotBlank() && contentState.text.isNotBlank()
 
     Scaffold(
         topBar = {
@@ -61,13 +57,7 @@ fun NoteEditScreen(
                 actions = {
                     IconButton(
                         onClick = {
-                            val updatedNote = NoteModel(
-                                id = note?.id ?: 0,
-                                title = titleState.text,
-                                content = contentState.text
-                            )
-                            if (isNewNote) viewModel.insert(updatedNote)
-                            else viewModel.update(updatedNote)
+                            viewModel.save(titleState.text, contentState.text)
                             onBack()
                         },
                         enabled = saveEnabled
@@ -79,11 +69,10 @@ fun NoteEditScreen(
                             else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                         )
                     }
-
-                    if (!isNewNote) {
+                    if (!isNewNote && note != null) {
                         IconButton(
                             onClick = {
-                                note.let { viewModel.delete(it) }
+                                viewModel.delete()
                                 onBack()
                             }
                         ) {
@@ -102,59 +91,41 @@ fun NoteEditScreen(
                 )
             )
         },
-        modifier = modifier,
         contentWindowInsets = WindowInsets(0)
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp)
-                .padding(top = 8.dp)
-        ) {
-            OutlinedTextField(
-                value = titleState,
-                onValueChange = { titleState = it },
-                label = {
-                    Text(
-                        text = stringResource(R.string.title),
-                        style = MaterialTheme.typography.labelLarge
-                    )
-                },
-                textStyle = MaterialTheme.typography.bodyLarge,
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                    focusedLabelColor = MaterialTheme.colorScheme.primary,
-                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                ),
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            OutlinedTextField(
-                value = contentState,
-                onValueChange = { contentState = it },
-                label = {
-                    Text(
-                        text = stringResource(R.string.content),
-                        style = MaterialTheme.typography.labelLarge
-                    )
-                },
-                textStyle = MaterialTheme.typography.bodyLarge,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                    focusedLabelColor = MaterialTheme.colorScheme.primary,
-                    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                ),
+        if (isLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        } else {
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                minLines = 10
-            )
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 8.dp)
+            ) {
+                OutlinedTextField(
+                    value = titleState,
+                    onValueChange = { titleState = it },
+                    label = { Text(stringResource(R.string.title)) },
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = contentState,
+                    onValueChange = { contentState = it },
+                    label = { Text(stringResource(R.string.content)) },
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    minLines = 10
+                )
+            }
         }
     }
 }
