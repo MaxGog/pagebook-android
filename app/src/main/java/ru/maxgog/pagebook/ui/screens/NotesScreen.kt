@@ -1,7 +1,6 @@
 package ru.maxgog.pagebook.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -16,13 +15,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import ru.maxgog.pagebook.R
-import ru.maxgog.pagebook.models.NoteModel
+import ru.maxgog.pagebook.data.models.NoteModel
 import ru.maxgog.pagebook.ui.EmptyState
 import ru.maxgog.pagebook.ui.NotesDestinations
 import ru.maxgog.pagebook.ui.items.NoteItem
@@ -32,7 +31,7 @@ import ru.maxgog.pagebook.viewmodels.NotesViewModel
 
 @Composable
 fun NotesScreen(
-    viewModel: NotesViewModel = viewModel(),
+    viewModel: NotesViewModel = hiltViewModel(),
     navController: NavHostController = rememberNavController()
 ) {
     val notes by viewModel.allNotes.collectAsState(initial = emptyList())

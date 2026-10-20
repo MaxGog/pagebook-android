@@ -88,6 +88,4 @@ Desktop.ini
 **/.cxx/
 **/build-cache/
 
-*.jks
-
 keystore.jks

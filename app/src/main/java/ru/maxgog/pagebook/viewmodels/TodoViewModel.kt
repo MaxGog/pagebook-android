@@ -3,6 +3,7 @@ package ru.maxgog.pagebook.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
 import jakarta.inject.Inject
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Instant
@@ -10,11 +11,12 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import ru.maxgog.pagebook.PageBookApplication
-import ru.maxgog.pagebook.models.EventModel
-import ru.maxgog.pagebook.models.TodoModel
-import ru.maxgog.pagebook.repositories.EventRepository
-import ru.maxgog.pagebook.repositories.TodoRepository
+import ru.maxgog.pagebook.data.models.EventModel
+import ru.maxgog.pagebook.data.models.TodoModel
+import ru.maxgog.pagebook.data.repositories.EventRepository
+import ru.maxgog.pagebook.data.repositories.TodoRepository
 
+@HiltViewModel
 class TodoViewModel @Inject constructor(
     private val repository: TodoRepository,
     private val eventRepository: EventRepository
@@ -60,14 +62,4 @@ class TodoViewModel @Inject constructor(
             date = date,
             time = time
         )
-
-    companion object {
-        val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                val application = PageBookApplication.getApplication()
-                return TodoViewModel(application.todoRepository, application.eventsRepository) as T
-            }
-        }
-    }
 }

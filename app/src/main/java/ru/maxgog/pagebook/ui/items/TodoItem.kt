@@ -12,7 +12,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import ru.maxgog.pagebook.models.TodoModel
+import ru.maxgog.pagebook.data.models.TodoModel
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter

@@ -1,8 +1,8 @@
-package ru.maxgog.pagebook.repositories
+package ru.maxgog.pagebook.data.repositories
 
 import kotlinx.coroutines.flow.Flow
-import ru.maxgog.pagebook.dao.TodoDao
-import ru.maxgog.pagebook.models.TodoModel
+import ru.maxgog.pagebook.data.dao.TodoDao
+import ru.maxgog.pagebook.data.models.TodoModel
 
 class TodoRepository(private val todoDao: TodoDao) {
     val allTodos: Flow<List<TodoModel>> = todoDao.getAllTodos()

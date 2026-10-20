@@ -1,4 +1,4 @@
-package ru.maxgog.pagebook.models
+package ru.maxgog.pagebook.data.models
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey

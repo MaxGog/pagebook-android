@@ -21,11 +21,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.kizitonwose.calendar.compose.VerticalCalendar
 import com.kizitonwose.calendar.compose.rememberCalendarState
 import com.kizitonwose.calendar.core.CalendarDay
 import ru.maxgog.pagebook.R
-import ru.maxgog.pagebook.models.EventModel
+import ru.maxgog.pagebook.data.models.EventModel
 import ru.maxgog.pagebook.toKotlinxLocalDate
 import ru.maxgog.pagebook.ui.EmptyState
 import ru.maxgog.pagebook.ui.dialogs.AddEventDialog
@@ -40,7 +41,7 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun CalendarScreen(
-    viewModel: CalendarViewModel,
+    viewModel: CalendarViewModel =  hiltViewModel(),
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current

@@ -14,15 +14,15 @@ PageBook Android следует официальным рекомендация�
 
 ## 🛠 Технологический стек
 
-| Компонент               | Технология                                        | Назначение                                                    |
-|-------------------------|---------------------------------------------------|---------------------------------------------------------------|
-| **Язык**                | Kotlin                                            | 100% кода на Kotlin                                           |
-| **UI**                  | Jetpack Compose + Material 3                      | Декларативный интерфейс                                       |
-| **Архитектура**         | MVVM + Repository                                 | Разделение ответственности                                    |
-| **Локальное хранилище** | Room Database                                     | Три независимые БД (`notes_db`, `todo_db`, `event_database`)  |
-| **Асинхронность**       | Kotlin Coroutines & Flow                          | Реактивные потоки данных из Room                              |
-| **DI**                  | Ручной (Manual DI)                                | Зависимости создаются в `PageBookApplication` через `by lazy` |
-| **Навигация**           | Jetpack Compose Navigation (внутри `CombinedApp`) | Переходы между экранами                                       |
+| Компонент               | Технология                                        | Назначение                                                     |
+|-------------------------|---------------------------------------------------|----------------------------------------------------------------|
+| **Язык**                | Kotlin                                            | 100% кода на Kotlin                                            |
+| **UI**                  | Jetpack Compose + Material 3                      | Декларативный интерфейс                                        |
+| **Архитектура**         | MVVM + Repository                                 | Разделение ответственности                                     |
+| **Локальное хранилище** | Room Database                                     | Три независимые БД (`notes_db`, `todo_db`, `event_database`)   |
+| **Асинхронность**       | Kotlin Coroutines & Flow                          | Реактивные потоки данных из Room                               |
+| **DI**                  | Hilt                                              | Модули `NotesModule`, `TodoModule`, `EventModule` в `data/di/` |
+| **Навигация**           | Jetpack Compose Navigation (внутри `CombinedApp`) | Переходы между экранами                                        |
 
 > ⚠️ **Важно:** В отличие от многих современных проектов, здесь **не используется Hilt**. Внедрение зависимостей происходит вручную в классе `PageBookApplication`. Это осознанное решение для уменьшения порога входа и упрощения сборки на ранних этапах.
 
@@ -37,25 +37,30 @@ ru.maxgog.pagebook
 │   ├── app/                    # CombinedApp — корневой Composable с навигацией
 │   └── theme/                  # Цвета, типографика, тема Material 3
 │
-├── models/                     # Модели данных (Entity для Room)
-│   ├── NoteModel.kt
-│   ├── TodoModel.kt
-│   └── EventModel.kt
-│
-├── dao/                        # Интерфейсы Room DAO
-│   ├── NoteDao.kt
-│   ├── TodoDao.kt
-│   └── EventDao.kt
-│
-├── rooms/                      # Классы RoomDatabase (Singleton для каждой БД)
-│   ├── NoteRoomDatabase.kt
-│   ├── TodoRoomDatabase.kt
-│   └── EventRoomDatabase.kt
-│
-└── repositories/               # Repository Layer
-├── NotesRepository.kt
-├── TodoRepository.kt
-└── EventRepository.kt
+└── data/ 
+    ├── models/                     # Модели данных (Entity для Room)
+    │   ├── NoteModel.kt
+    │   ├── TodoModel.kt
+    │   └── EventModel.kt
+    │
+    ├── dao/                        # Интерфейсы Room DAO
+    │   ├── NoteDao.kt
+    │   ├── TodoDao.kt
+    │   └── EventDao.kt
+    │
+    ├── rooms/                      # Классы RoomDatabase (Singleton для каждой БД)
+    │   ├── NoteRoomDatabase.kt
+    │   ├── TodoRoomDatabase.kt
+    │   └── EventRoomDatabase.kt
+    │
+    ├── repositories/               # Repository Layer
+    │   ├── NotesRepository.kt
+    │   ├── TodoRepository.kt
+    │   └── EventRepository.kt
+    └── di/                          # Hilt-модули
+        ├── NotesModule.kt
+        ├── TodoModule.kt
+        └── EventModule.kt
 ```
 
 ### Краткое описание слоёв
@@ -113,7 +118,7 @@ sequenceDiagram
 ## 🚀 Планы по развитию архитектуры
 
 - [ ] Выделить **Domain Layer** (Use Cases) при усложнении бизнес-логики (например, синхронизация, офлайн-режим).
-- [ ] Внедрить **Hilt** для масштабируемого DI, если количество зависимостей вырастет.
+- [+] Внедрить **Hilt** для масштабируемого DI, если количество зависимостей вырастет.
 - [ ] Добавить **отдельные Domain-модели** для отвязки UI от схемы БД.
 - [ ] Настроить **модуляризацию** (feature-модули) для ускорения сборки.
 

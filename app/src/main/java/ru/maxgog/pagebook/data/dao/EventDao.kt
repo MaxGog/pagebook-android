@@ -1,4 +1,4 @@
-package ru.maxgog.pagebook.dao
+package ru.maxgog.pagebook.data.dao
 
 import androidx.room.Dao
 import androidx.room.Delete
@@ -7,7 +7,7 @@ import androidx.room.Query
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import kotlinx.datetime.LocalDateTime
-import ru.maxgog.pagebook.models.EventModel
+import ru.maxgog.pagebook.data.models.EventModel
 import java.util.Date
 
 @Dao

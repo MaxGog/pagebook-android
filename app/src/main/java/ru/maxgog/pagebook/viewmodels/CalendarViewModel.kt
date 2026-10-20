@@ -3,15 +3,17 @@ package ru.maxgog.pagebook.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.boguszpawlowski.composecalendar.kotlinxDateTime.now
 import jakarta.inject.Inject
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import ru.maxgog.pagebook.PageBookApplication
-import ru.maxgog.pagebook.models.EventModel
-import ru.maxgog.pagebook.repositories.EventRepository
+import ru.maxgog.pagebook.data.models.EventModel
+import ru.maxgog.pagebook.data.repositories.EventRepository
 
+@HiltViewModel
 class CalendarViewModel @Inject constructor(
     private val repository: EventRepository
 ) : ViewModel() {
@@ -57,13 +59,5 @@ class CalendarViewModel @Inject constructor(
 
     private fun loadEvents() = viewModelScope.launch {
         _events.value = repository.getAllEvents()
-    }
-
-    companion object {
-        val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                CalendarViewModel(PageBookApplication.getApplication().eventsRepository) as T
-        }
     }
 }

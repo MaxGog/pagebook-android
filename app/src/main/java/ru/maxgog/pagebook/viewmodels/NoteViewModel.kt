@@ -1,14 +1,14 @@
 package ru.maxgog.pagebook.viewmodels
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import jakarta.inject.Inject
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
-import ru.maxgog.pagebook.PageBookApplication
-import ru.maxgog.pagebook.models.NoteModel
-import ru.maxgog.pagebook.repositories.NotesRepository
+import ru.maxgog.pagebook.data.models.NoteModel
+import ru.maxgog.pagebook.data.repositories.NotesRepository
+import javax.inject.Inject
 
+@HiltViewModel
 class NotesViewModel @Inject constructor(
     private val repository: NotesRepository
 ) : ViewModel() {
@@ -21,11 +21,4 @@ class NotesViewModel @Inject constructor(
 
     fun delete(note: NoteModel) = viewModelScope.launch { repository.delete(note) }
 
-    companion object {
-        val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                NotesViewModel(PageBookApplication.getApplication().notesRepository) as T
-        }
-    }
 }

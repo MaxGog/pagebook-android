@@ -7,7 +7,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import ru.maxgog.pagebook.models.NoteModel
+import ru.maxgog.pagebook.data.models.NoteModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

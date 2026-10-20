@@ -11,7 +11,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import ru.maxgog.pagebook.R
-import ru.maxgog.pagebook.models.NoteModel
+import ru.maxgog.pagebook.data.models.NoteModel
 import ru.maxgog.pagebook.ui.theme.SetTransparentSystemBars
 import ru.maxgog.pagebook.viewmodels.NotesViewModel
 

@@ -41,8 +41,8 @@ PageBook — это нативное Android-приложение для раб�
 - **🎨 Jetpack Compose** — декларативный UI
 - **💾 Room Database** — надёжное локальное хранение
 - **🔄 Coroutines & Flow** — реактивное программирование
-- **🧩 Ручной DI** — внедрение зависимостей через `PageBookApplication` (пока без Hilt)
-- **📐 Material Design 3** — современные UI-компоненты
+- **🧩 Hilt** — модули `NotesModule`, `TodoModule`, `EventModule`
+- **📐 Material Design 3**
 
 ## 🏗 Архитектура
 

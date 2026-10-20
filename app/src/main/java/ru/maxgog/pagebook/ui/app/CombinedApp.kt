@@ -8,13 +8,12 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import ru.maxgog.pagebook.viewmodels.CalendarViewModel
 import ru.maxgog.pagebook.viewmodels.NotesViewModel
@@ -30,22 +29,12 @@ fun CombinedApp(
 ) {
     val navController = rememberNavController()
     val snackbarHostState = remember { SnackbarHostState() }
-    val coroutineScope = rememberCoroutineScope()
 
-    val notesViewModel: NotesViewModel = viewModel(
-        viewModelStoreOwner = viewModelStoreOwner,
-        factory = NotesViewModel.Factory
-    )
+    val notesViewModel: NotesViewModel = hiltViewModel(viewModelStoreOwner = viewModelStoreOwner)
 
-    val todoViewModel: TodoViewModel = viewModel(
-        viewModelStoreOwner = viewModelStoreOwner,
-        factory = TodoViewModel.Factory
-    )
+    val todoViewModel: TodoViewModel = hiltViewModel(viewModelStoreOwner = viewModelStoreOwner)
 
-    val calendarViewModel: CalendarViewModel = viewModel(
-        viewModelStoreOwner = viewModelStoreOwner,
-        factory = CalendarViewModel.Factory
-    )
+    val calendarViewModel: CalendarViewModel = hiltViewModel(viewModelStoreOwner = viewModelStoreOwner)
 
     Scaffold(
         modifier = Modifier.systemBarsPadding(),

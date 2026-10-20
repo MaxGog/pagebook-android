@@ -1,8 +1,8 @@
-package ru.maxgog.pagebook.repositories
+package ru.maxgog.pagebook.data.repositories
 
 import kotlinx.coroutines.flow.Flow
-import ru.maxgog.pagebook.dao.NoteDao
-import ru.maxgog.pagebook.models.NoteModel
+import ru.maxgog.pagebook.data.dao.NoteDao
+import ru.maxgog.pagebook.data.models.NoteModel
 
 class NotesRepository(private val noteDao: NoteDao) {
     val allNotes: Flow<List<NoteModel>> = noteDao.getAll()
