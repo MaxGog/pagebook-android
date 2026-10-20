@@ -19,7 +19,7 @@ android {
         versionCode = 6
         versionName = "2.1"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "ru.maxgog.pagebook.HiltTestRunner"
     }
 
     signingConfigs {
@@ -40,8 +40,8 @@ android {
     buildTypes {
         getByName("release") {
             signingConfig = signingConfigs.getByName("release")
-            isShrinkResources = true
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -66,16 +66,6 @@ android {
         compose = true
     }
 
-    buildTypes {
-        release {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
-    }
     buildToolsVersion = "37.0.0"
     ndkVersion = "28.2.13676358"
 }
@@ -89,7 +79,6 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.livedata.ktx)
-    implementation(libs.androidx.lifecycle.viewmodel.compose.v262)
 
     // Compose
     implementation(platform(libs.androidx.compose.bom))
@@ -98,24 +87,19 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.runtime.livedata)
     implementation(libs.androidx.foundation)
-    implementation(libs.ui)
-    implementation(libs.ui.tooling.preview)
-    implementation(libs.compose)
+    implementation(libs.compose.v2101)
 
     // Material Design
     implementation(libs.androidx.material)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.material.icons.core)
-    implementation(libs.androidx.material.v150)
     implementation(libs.material3)
     implementation(libs.androidx.material3.window.size.class1)
     implementation(libs.material)
-    implementation(libs.androidx.material3.v120)
 
     // Navigation
     implementation(libs.androidx.navigation.compose)
-    implementation(libs.androidx.navigation.compose.v270)
 
     // Room Database
     implementation(libs.androidx.room.runtime)
@@ -135,17 +119,25 @@ dependencies {
     // Other UI
     implementation(libs.composecalendar)
     implementation(libs.accompanist.systemuicontroller)
+    implementation("com.mohamedrejeb.richeditor:richeditor-compose:1.0.0-rc09")
 
     // Testing
     testImplementation(libs.junit)
+    testImplementation(libs.truth)
+
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.ui.test.junit4)
+    androidTestImplementation(libs.androidx.ui.test.junit4) // одна версия, без дубликата
+
+    // Hilt для инструментальных тестов
+    androidTestImplementation(libs.hilt.android.testing)
+    kspAndroidTest(libs.hilt.android.compiler) // версия должна совпадать с hilt.android.testing
+
+    // Обязательно для HiltTestApplication в тестах
+    androidTestImplementation("androidx.multidex:multidex:2.0.1")
 
     // Debug
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
-
-    implementation("com.mohamedrejeb.richeditor:richeditor-compose:1.0.0-rc09")
 }
