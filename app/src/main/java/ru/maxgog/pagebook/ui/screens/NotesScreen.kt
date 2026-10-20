@@ -1,11 +1,9 @@
 package ru.maxgog.pagebook.ui.screens
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Settings
@@ -15,12 +13,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import ru.maxgog.pagebook.R
 import ru.maxgog.pagebook.data.models.NoteModel
 import ru.maxgog.pagebook.ui.EmptyState
 import ru.maxgog.pagebook.ui.items.NoteItem
-import ru.maxgog.pagebook.ui.theme.AppTheme
 import ru.maxgog.pagebook.viewmodels.NoteViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -36,7 +34,6 @@ fun NotesScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                modifier = Modifier.statusBarsPadding(),
                 title = { Text(stringResource(R.string.notes)) },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -53,11 +50,14 @@ fun NotesScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
+            ExtendedFloatingActionButton(
                 onClick = onAddNote,
-                containerColor = MaterialTheme.colorScheme.primaryContainer
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
             ) {
-                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add))
+                Icon(Icons.Default.Add, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.add))
             }
         }
     ) { innerPadding ->
@@ -69,17 +69,19 @@ fun NotesScreen(
                     .padding(innerPadding)
             )
         } else {
-            LazyColumn(
+            LazyVerticalStaggeredGrid(
+                columns = StaggeredGridCells.Fixed(2),
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
-                verticalArrangement = Arrangement.spacedBy(AppTheme.itemSpacing)
+                verticalItemSpacing = 12.dp,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(16.dp)
             ) {
                 items(notes, key = NoteModel::id) { note ->
                     NoteItem(
                         note = note,
-                        onClick = { onNoteClick(note.id) },
-                        modifier = Modifier.padding(horizontal = AppTheme.horizontalPadding)
+                        onClick = { onNoteClick(note.id) }
                     )
                 }
             }

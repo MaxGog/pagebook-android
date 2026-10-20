@@ -30,6 +30,7 @@ materialIconsExtended = "1.7.8"
 materialVersion = "1.8.3"
 navigationCompose = "2.9.0"
 navigationComposeVersion = "2.9.0"
+richeditorCompose = "1.2.1"
 roomRuntime = "2.7.2"
 roomCompiler = "2.7.2"
 roomKtx = "2.7.2"
@@ -81,6 +82,7 @@ kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutine
 kotlinx-datetime = { module = "io.github.boguszpawlowski.composecalendar:kotlinx-datetime", version.ref = "composecalendar" }
 material = { module = "com.google.android.material:material", version.ref = "googleMaterial" }
 material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" }
+richeditor-compose = { module = "com.mohamedrejeb.richeditor:richeditor-compose", version.ref = "richeditorCompose" }
 threetenabp = { module = "com.jakewharton.threetenabp:threetenabp", version.ref = "threetenabp" }
 ui = { module = "androidx.compose.ui:ui", version.ref = "ui" }
 ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview", version.ref = "uiToolingPreview" }
