@@ -1,6 +1,5 @@
-package ru.maxgog.pagebook.ui.screens
+package ru.maxgog.pagebook.ui.calendar
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -12,123 +11,115 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kizitonwose.calendar.compose.VerticalCalendar
 import com.kizitonwose.calendar.compose.rememberCalendarState
 import com.kizitonwose.calendar.core.CalendarDay
 import ru.maxgog.pagebook.R
-import ru.maxgog.pagebook.data.models.EventModel
+import ru.maxgog.pagebook.domain.model.Event
 import ru.maxgog.pagebook.toKotlinxLocalDate
 import ru.maxgog.pagebook.ui.EmptyState
-import ru.maxgog.pagebook.ui.dialogs.AddEventDialog
-import ru.maxgog.pagebook.ui.items.EventItem
 import ru.maxgog.pagebook.ui.theme.AppTheme
-import ru.maxgog.pagebook.viewmodels.CalendarViewModel
 import java.time.YearMonth
 import java.time.format.TextStyle
-import java.util.Locale
-import androidx.compose.ui.platform.LocalLocale
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarScreen(
-    viewModel: CalendarViewModel =  hiltViewModel(),
+    viewModel: CalendarViewModel = hiltViewModel(),
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
     val currentMonth = remember { YearMonth.now() }
     val startMonth = remember { currentMonth.minusMonths(12) }
     val endMonth = remember { currentMonth.plusMonths(12) }
-    val state = rememberCalendarState(
+    val calendarState = rememberCalendarState(
         startMonth = startMonth,
         endMonth = endMonth,
         firstVisibleMonth = currentMonth
     )
 
-    /*val showDialog by viewModel.showDialog.collectAsState()
-    val dialogDate by viewModel.dialogDate.collectAsState()
-    val selectedDate by viewModel.selectedDate.collectAsState()
-    val events by viewModel.events.collectAsState()
-
-    LaunchedEffect(selectedDate) {
-        state.animateScrollToMonth(YearMonth.of(selectedDate.year, selectedDate.month))
+    // При смене выбранной даты — скроллим календарь к её месяцу
+    LaunchedEffect(uiState.selectedDate) {
+        calendarState.animateScrollToMonth(
+            YearMonth.of(uiState.selectedDate.year, uiState.selectedDate.monthNumber)
+        )
     }
-
-    SetTransparentSystemBars()
 
     Scaffold(
         modifier = modifier,
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { viewModel.showAddEventDialog(selectedDate) },
+                onClick = { viewModel.showAddDialog() },
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer
             ) {
-                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add))
+                Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.add))
             }
         },
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = WindowInsets(0)
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            VerticalCalendar(
-                state = state,
-                modifier = Modifier.weight(1f),
-                dayContent = { day ->
-                    val dayEvents = remember(day.date, events) {
-                        events.filter { it.date == day.date }
-                    }
-                    Day(
-                        day = day,
-                        isSelected = day.date == selectedDate,
-                        onClick = { viewModel.onDateSelected(day.date.toKotlinxLocalDate()) },
-                        events = dayEvents
-                    )
-                },
-                monthHeader = { month ->
-                    MonthHeader(month.yearMonth)
-                }
+        when {
+            uiState.isLoading -> Box(
+                modifier = Modifier.fillMaxSize().padding(innerPadding),
+                contentAlignment = Alignment.Center
+            ) { CircularProgressIndicator() }
+
+            uiState.error != null -> EmptyState(
+                text = uiState.error ?: "",
+                modifier = Modifier.padding(innerPadding)
             )
 
-            val selectedEvents = remember(selectedDate, events) {
-                events.filter { it.date == selectedDate }
+            else -> Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
+                VerticalCalendar(
+                    state = calendarState,
+                    modifier = Modifier.weight(1f),
+                    dayContent = { day ->
+                        val dayEvents = remember(day.date, uiState.eventsForSelectedDate) {
+                            if (day.date == uiState.selectedDate) uiState.eventsForSelectedDate
+                            else emptyList()
+                        }
+                        DayCell(
+                            day = day,
+                            isSelected = day.date == uiState.selectedDate,
+                            hasEvents = dayEvents.isNotEmpty(),
+                            onClick = { viewModel.onDateSelected(day.date.toKotlinxLocalDate()) }
+                        )
+                    },
+                    monthHeader = { month -> MonthHeader(month.yearMonth) }
+                )
+
+                EventsList(
+                    events = uiState.eventsForSelectedDate,
+                    onDelete = viewModel::deleteEvent,
+                    modifier = Modifier.weight(1f)
+                )
             }
-
-            EventsList(
-                events = selectedEvents,
-                onDelete = viewModel::deleteEvent,
-                modifier = Modifier.weight(1f)
-            )
         }
     }
 
-    if (showDialog) {
+    if (uiState.showAddDialog) {
         AddEventDialog(
-            date = dialogDate,
-            onDismiss = { viewModel.hideAddEventDialog() },
+            date = uiState.selectedDate,
+            onDismiss = { viewModel.hideAddDialog() },
             onConfirm = { title, description, date, time ->
-                viewModel.addEvent(
-                    EventModel(
-                        title = title,
-                        description = description,
-                        date = date,
-                        time = time
-                    )
-                )
+                viewModel.addEvent(title, description, date, time)
             }
         )
     }
@@ -136,8 +127,8 @@ fun CalendarScreen(
 
 @Composable
 private fun EventsList(
-    events: List<EventModel>,
-    onDelete: (EventModel) -> Unit,
+    events: List<Event>,
+    onDelete: (Event) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (events.isNotEmpty()) {
@@ -164,6 +155,7 @@ private fun EventsList(
 
 @Composable
 private fun MonthHeader(yearMonth: YearMonth) {
+    val locale = LocalConfiguration.current.locales[0]
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -174,10 +166,8 @@ private fun MonthHeader(yearMonth: YearMonth) {
         )
     ) {
         Text(
-            text = yearMonth.month.getDisplayName(
-                TextStyle.FULL_STANDALONE,
-                LocalLocale.current.platformLocale
-            ).replaceFirstChar { it.titlecase() } + " " + yearMonth.year,
+            text = yearMonth.month.getDisplayName(TextStyle.FULL_STANDALONE, locale)
+                .replaceFirstChar { it.titlecase(locale) } + " " + yearMonth.year,
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(AppTheme.horizontalPadding)
         )
@@ -185,23 +175,16 @@ private fun MonthHeader(yearMonth: YearMonth) {
 }
 
 @Composable
-private fun Day(
+private fun DayCell(
     day: CalendarDay,
     isSelected: Boolean,
-    onClick: () -> Unit,
-    events: List<EventModel>
+    hasEvents: Boolean,
+    onClick: () -> Unit
 ) {
-    val containerColor = if (isSelected) {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        MaterialTheme.colorScheme.surface
-    }
-
-    val contentColor = if (isSelected) {
-        MaterialTheme.colorScheme.onPrimaryContainer
-    } else {
-        MaterialTheme.colorScheme.onSurface
-    }
+    val containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer
+    else MaterialTheme.colorScheme.surface
+    val contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+    else MaterialTheme.colorScheme.onSurface
 
     Box(
         modifier = Modifier
@@ -212,18 +195,14 @@ private fun Day(
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = day.date.dayOfMonth.toString(),
                 color = contentColor,
                 style = MaterialTheme.typography.bodyMedium
             )
-
-            if (events.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(4.dp))
+            if (hasEvents) {
+                Spacer(Modifier.height(4.dp))
                 Box(
                     modifier = Modifier
                         .size(6.dp)
@@ -232,5 +211,5 @@ private fun Day(
                 )
             }
         }
-    }*/
+    }
 }

@@ -5,9 +5,9 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import ru.maxgog.pagebook.ui.screens.CalendarScreen
-import ru.maxgog.pagebook.ui.screens.SettingsScreen
-import ru.maxgog.pagebook.ui.note_edit.NoteEditScreen
+import ru.maxgog.pagebook.ui.calendar.CalendarScreen
+import ru.maxgog.pagebook.ui.settings.SettingsScreen
+import ru.maxgog.pagebook.ui.notes.note_edit.NoteEditScreen
 import ru.maxgog.pagebook.ui.notes.NotesScreen
 import ru.maxgog.pagebook.ui.tasks.TaskEditScreen
 import ru.maxgog.pagebook.ui.tasks.TaskListScreen

@@ -1,4 +1,4 @@
-package ru.maxgog.pagebook.ui.note_edit
+package ru.maxgog.pagebook.ui.notes.note_edit
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel

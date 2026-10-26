@@ -23,27 +23,29 @@ PageBook — это нативное Android-приложение для раб�
 ## ✨ Основные возможности
 
 ### 📝 Умные заметки
-- Создание и редактирование заметок
-- Быстрый поиск и фильтрация
+- Создание и редактирование заметок с rich-text форматированием
+- Адаптивная сетка заметок (StaggeredGrid)
+- Создание задач прямо из заметок с автоматическим извлечением дат
 
 ### ✅ Менеджер задач
-- To-do листы с приоритетами
-- Напоминания и дедлайны
-- Прогресс выполнения
+- Задачи с напоминаниями и связью с заметками
+- Сортировка: незавершённые сверху, новые первыми
+- Автоматическое определение даты из текста заметки (ML Kit)
 
 ### 🗓️ Календарь и планирование
-- Ежедневное и недельное планирование
-- Интеграция задач и событий
-- Гибкие настройки отображения
+- Ежедневное планирование событий с выбором даты и времени
+- Реактивное обновление при изменении событий
+- Быстрый скролл к выбранной дате
 
 ## 🛠 Технологический стек
 
 - **💚 100% Kotlin** — Kotlin 2.2.20
 - **🎨 Jetpack Compose** — BOM 2026.09.00, Material 3 Expressive
-- **💾 Room Database** — надёжное локальное хранение
+- **💾 Room Database** — три изолированные БД (notes, tasks, events)
 - **🔄 Coroutines & Flow** — реактивное программирование
 - **🧩 Hilt** — внедрение зависимостей
-- **🧭 Navigation Compose** — type-safe навигация
+- **🧭 Navigation Compose** — type-safe навигация через `@Serializable` destinations
+- **🤖 ML Kit Entity Extraction** — извлечение дат из текста заметок
 - **📐 Material Design 3** + edge-to-edge
 - **🏗 Clean Architecture** — UI / Domain / Data
 
@@ -51,16 +53,18 @@ PageBook — это нативное Android-приложение для раб�
 
 ```mermaid
 graph TD
-   A[UI Layer<br/>Compose + ViewModel] --> B[Domain Layer<br/>Use Cases + интерфейсы]
-   B --> C[Data Layer<br/>Repository Impl + Room]
-   C --> D[(Local DB - Room)]
+   A[UI Layer<br/>Compose + ViewModel + UiState] --> B[Domain Layer<br/>Use Cases + доменные модели]
+   B --> C[Data Layer<br/>Repository Impl + Mappers + Room]
+   C --> D[(Local DB - Room<br/>notes, tasks, events)]
    C -.-> E[(Remote - Future)]
 ```
 
-### MVVM + Repository
-- **UI Layer**: Jetpack Compose + ViewModel
-- **Data Layer**: Repository pattern + Room
-- **Domain Layer**: _Планируется_ (Use Cases пока отсутствуют)
+### Clean Architecture
+- **UI Layer**: Jetpack Compose + ViewModel + UiState (sealed interface / data class)
+- **Domain Layer**: Use Cases, доменные модели (Note, Task, Event), интерфейсы репозиториев
+- **Data Layer**: Room, DAO, мапперы, реализации репозиториев, Hilt-модули
+
+Все три модуля — **Notes**, **Tasks**, **Calendar** — полностью на Clean Architecture.
 
 Подробнее см. в [ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -93,35 +97,41 @@ graph TD
 ```
 app/src/main/java/ru/maxgog/pagebook/
 ├── data/
-│   ├── dao/            # NoteDao, TodoDao, EventDao
-│   ├── models/         # Room-сущности
-│   ├── rooms/          # RoomDatabase
-│   ├── mapper/         # Note ↔ NoteModel
-│   ├── repository/     # NoteRepositoryImpl
-│   └── di/             # Hilt-модули
+│   ├── dao/            # NoteDao, TaskDao, EventDao
+│   ├── models/         # Room-сущности (@Entity)
+│   ├── rooms/          # NoteRoomDatabase, TaskRoomDatabase, EventRoomDatabase
+│   ├── mapper/         # NoteMapper, TaskMapper, EventMapper
+│   ├── repository/     # *RepositoryImpl (реализации интерфейсов)
+│   └── di/             # NotesModule, TaskModule, EventModule (Hilt)
 ├── domain/
-│   ├── model/          # Note
-│   ├── repository/     # NoteRepository (интерфейс)
-│   └── usecase/        # GetAllNotesUseCase, SaveNoteUseCase, ...
+│   ├── model/          # Note, Task, Event
+│   ├── repository/     # NoteRepository, TaskRepository, EventRepository (интерфейсы)
+│   └── usecase/
+│       ├── note/       # GetAllNotesUseCase, SaveNoteUseCase, DeleteNoteUseCase
+│       ├── task/       # GetAllTasksUseCase, SaveTaskUseCase, DeleteTaskUseCase,
+│       │               #   GetTaskByIdUseCase, CreateTaskFromNoteUseCase
+│       └── event/      # GetAllEventsUseCase, SaveEventUseCase, DeleteEventUseCase
 ├── ui/
-│   ├── app/            # CombinedApp
+│   ├── app/            # CombinedApp (корневой Scaffold)
 │   ├── navigation/     # Destinations, AppNavHost, BottomNavBar
 │   ├── notes/          # NotesScreen + ViewModel + UiState
 │   ├── note_edit/      # NoteEditScreen + ViewModel + UiState
-│   ├── screens/        # Todo, Calendar, Settings
-│   ├── items/          # NoteItem, TodoItem, EventItem
-│   └── theme/          # Material 3
+│   ├── tasks/          # TaskListScreen, TaskEditScreen, TaskItem + ViewModels
+│   ├── calendar/       # CalendarScreen + ViewModel + UiState
+│   ├── items/          # NoteItem, EventItem
+│   ├── dialogs/        # AddEventDialog, DateTimePickerDialog, AddTodoDialog
+│   └── theme/          # Color, Type, Theme
 ├── PageBookApplication.kt
 └── MainActivity.kt
 ```
 
 ## 🧩 Функциональные возможности
 
-| Возможность | Описание                  | Технологии               |
-|-------------|---------------------------|--------------------------|
-| **Notes**   | Управление заметками 📝   | Compose, Room, ViewModel |
-| **Todos**   | To-do листы и задачи ✅   | Compose, StateFlow, Room |
-| **Events**  | Планирование и события 🗓️ | Compose, Date Picker     |
+| Модуль | Возможности | Технологии |
+|--------|-------------|------------|
+| **Notes** 📝 | Rich-text заметки, адаптивная сетка, создание задач с извлечением дат | Compose, Room, RichEditor, ML Kit |
+| **Tasks** ✅ | Задачи с напоминаниями, связь с заметками (`noteId`), сортировка по статусу | Compose, StateFlow, Room |
+| **Calendar** 🗓️ | События по датам, реактивное обновление, скролл к выбранной дате | Compose, kizitonwose Calendar, Room |
 
 ## 🛠 Разработка
 
@@ -153,12 +163,19 @@ app/src/main/java/ru/maxgog/pagebook/
 
 ## 🎯 Планы развития
 
+- [x] **Clean Architecture** для всех модулей (Notes, Tasks, Calendar)
+- [x] **Type-safe navigation** через `@Serializable` destinations
+- [x] **Hilt** для внедрения зависимостей
+- [x] **ML Kit** для извлечения дат из заметок
+- [ ] **UI для создания задач из заметок** 🤖
 - [ ] **Синхронизация с облаком** ☁️
 - [ ] **Ручное переключение тёмной темы** 🌙
 - [ ] **Виджеты для главного экрана** 🏠
 - [ ] **Резервное копирование** 💾
 - [ ] **Голосовые заметки** 🎤
-- [ ] **Перенос Todos и Events на Clean Architecture**
+- [ ] **Объединение трёх БД в PageBookDatabase** с ForeignKey
+- [ ] **Модуляризация** (feature-модули)
+- [ ] **Unit-тесты** для Use Cases и Repository
 - [ ] **Kotlin Multiplatform** для общей бизнес-логики
 
 ## 👨‍💻 Автор

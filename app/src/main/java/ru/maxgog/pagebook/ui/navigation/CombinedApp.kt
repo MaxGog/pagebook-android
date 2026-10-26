@@ -1,4 +1,4 @@
-package ru.maxgog.pagebook.ui.app
+package ru.maxgog.pagebook.ui.navigation
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
@@ -15,11 +15,6 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import ru.maxgog.pagebook.ui.navigation.AppNavHost
-import ru.maxgog.pagebook.ui.navigation.BottomNavBar
-import ru.maxgog.pagebook.ui.navigation.CalendarDestination
-import ru.maxgog.pagebook.ui.navigation.NotesDestination
-import ru.maxgog.pagebook.ui.navigation.TaskListDestination
 
 @Composable
 fun CombinedApp(

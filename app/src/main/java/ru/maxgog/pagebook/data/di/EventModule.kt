@@ -8,8 +8,9 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import ru.maxgog.pagebook.data.dao.EventDao
-import ru.maxgog.pagebook.data.repositories.EventRepository
+import ru.maxgog.pagebook.data.repository.EventRepositoryImpl
 import ru.maxgog.pagebook.data.rooms.EventRoomDatabase
+import ru.maxgog.pagebook.domain.repository.EventRepository
 import javax.inject.Singleton
 
 @Module
@@ -18,22 +19,15 @@ object EventModule {
 
     @Provides
     @Singleton
-    fun provideEventDatabase(@ApplicationContext context: Context): EventRoomDatabase {
-        return Room.databaseBuilder(
-            context,
-            EventRoomDatabase::class.java,
-            "events_db"
-        ).build()
-    }
+    fun provideEventDatabase(@ApplicationContext context: Context): EventRoomDatabase =
+        Room.databaseBuilder(context, EventRoomDatabase::class.java, "events_db")
+            .fallbackToDestructiveMigration()
+            .build()
 
     @Provides
-    fun provideEventDao(database: EventRoomDatabase): EventDao {
-        return database.eventDao()
-    }
+    fun provideEventDao(database: EventRoomDatabase): EventDao = database.eventDao()
 
     @Provides
     @Singleton
-    fun provideEventRepository(dao: EventDao): EventRepository {
-        return EventRepository(dao)
-    }
+    fun provideEventRepository(dao: EventDao): EventRepository = EventRepositoryImpl(dao)
 }

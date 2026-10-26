@@ -1,4 +1,4 @@
-package ru.maxgog.pagebook.ui.note_edit
+package ru.maxgog.pagebook.ui.notes.note_edit
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons

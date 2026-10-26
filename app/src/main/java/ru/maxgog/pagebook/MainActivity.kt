@@ -5,7 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import dagger.hilt.android.AndroidEntryPoint
-import ru.maxgog.pagebook.ui.app.CombinedApp
+import ru.maxgog.pagebook.ui.navigation.CombinedApp
 import ru.maxgog.pagebook.ui.theme.CombinedAppTheme
 
 @AndroidEntryPoint

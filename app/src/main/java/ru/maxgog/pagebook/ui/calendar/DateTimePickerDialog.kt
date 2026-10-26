@@ -1,4 +1,4 @@
-package ru.maxgog.pagebook.ui.dialogs
+package ru.maxgog.pagebook.ui.calendar
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
