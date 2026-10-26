@@ -2,10 +2,11 @@
 
 **Нативная Android-реализация** универсального органайзера с акцентом на плавность работы и Material Design! 🚀
 
-[![Kotlin](https://img.shields.io/badge/Kotlin-1.9.0-blue.svg)](https://kotlinlang.org)
-[![Compose](https://img.shields.io/badge/Jetpack%20Compose-1.5-blue.svg)](https://developer.android.com/jetpack/compose)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.2.20-blue.svg)](https://kotlinlang.org)
+[![Compose](https://img.shields.io/badge/Jetpack%20Compose-BOM%202026.09.00-blue.svg)](https://developer.android.com/jetpack/compose)
+[![AGP](https://img.shields.io/badge/AGP-9.4.1-green.svg)](https://developer.android.com/build/releases/gradle-plugin)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.0-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.2.0--dev-orange.svg)](CHANGELOG.md)
 
 ## 🌟 О проекте
 
@@ -37,25 +38,23 @@ PageBook — это нативное Android-приложение для раб�
 
 ## 🛠 Технологический стек
 
-- **💚 100% Kotlin** — современный и выразительный код
-- **🎨 Jetpack Compose** — декларативный UI
+- **💚 100% Kotlin** — Kotlin 2.2.20
+- **🎨 Jetpack Compose** — BOM 2026.09.00, Material 3 Expressive
 - **💾 Room Database** — надёжное локальное хранение
 - **🔄 Coroutines & Flow** — реактивное программирование
-- **🧩 Hilt** — модули `NotesModule`, `TodoModule`, `EventModule`
-- **📐 Material Design 3**
+- **🧩 Hilt** — внедрение зависимостей
+- **🧭 Navigation Compose** — type-safe навигация
+- **📐 Material Design 3** + edge-to-edge
+- **🏗 Clean Architecture** — UI / Domain / Data
 
 ## 🏗 Архитектура
 
 ```mermaid
 graph TD
-    A[UI Layer - Compose] --> B[ViewModel]
-    B --> C[Repository Layer]
-    C --> D[Local Data - Room]
-    C --> E[Remote Data - Future]
-
-    style A fill:#e1f5fe
-    style B fill:#f3e5f5
-    style C fill:#e8f5e8
+   A[UI Layer<br/>Compose + ViewModel] --> B[Domain Layer<br/>Use Cases + интерфейсы]
+   B --> C[Data Layer<br/>Repository Impl + Room]
+   C --> D[(Local DB - Room)]
+   C -.-> E[(Remote - Future)]
 ```
 
 ### MVVM + Repository
@@ -68,9 +67,10 @@ graph TD
 ## 🚀 Быстрый старт
 
 ### Предварительные требования
-- Android Studio Hedgehog или новее
-- Android SDK 34 (Android 14)
-- Kotlin 1.9.0+
+- Android Studio Otter (2026.1) или новее
+- Android SDK 37 (Android 17)
+- JDK 21
+- Kotlin 2.2.20+
 
 ### Установка и запуск
 
@@ -92,13 +92,25 @@ graph TD
 
 ```
 app/src/main/java/ru/maxgog/pagebook/
+├── data/
+│   ├── dao/            # NoteDao, TodoDao, EventDao
+│   ├── models/         # Room-сущности
+│   ├── rooms/          # RoomDatabase
+│   ├── mapper/         # Note ↔ NoteModel
+│   ├── repository/     # NoteRepositoryImpl
+│   └── di/             # Hilt-модули
+├── domain/
+│   ├── model/          # Note
+│   ├── repository/     # NoteRepository (интерфейс)
+│   └── usecase/        # GetAllNotesUseCase, SaveNoteUseCase, ...
 ├── ui/
-│   ├── app/            # CombinedApp — навигация и корневой Composable
-│   └── theme/          # Тема Material 3
-├── models/             # Room-сущности (NoteModel, TodoModel, EventModel)
-├── dao/                # DAO-интерфейсы
-├── rooms/              # RoomDatabase (Singleton для каждой БД)
-├── repositories/       # Репозитории
+│   ├── app/            # CombinedApp
+│   ├── navigation/     # Destinations, AppNavHost, BottomNavBar
+│   ├── notes/          # NotesScreen + ViewModel + UiState
+│   ├── note_edit/      # NoteEditScreen + ViewModel + UiState
+│   ├── screens/        # Todo, Calendar, Settings
+│   ├── items/          # NoteItem, TodoItem, EventItem
+│   └── theme/          # Material 3
 ├── PageBookApplication.kt
 └── MainActivity.kt
 ```
@@ -142,15 +154,12 @@ app/src/main/java/ru/maxgog/pagebook/
 ## 🎯 Планы развития
 
 - [ ] **Синхронизация с облаком** ☁️
-- [ ] **Тёмная тема** 🌙
+- [ ] **Ручное переключение тёмной темы** 🌙
 - [ ] **Виджеты для главного экрана** 🏠
 - [ ] **Резервное копирование** 💾
 - [ ] **Голосовые заметки** 🎤
+- [ ] **Перенос Todos и Events на Clean Architecture**
 - [ ] **Kotlin Multiplatform** для общей бизнес-логики
-
-## 📄 Лицензия
-
-Этот проект распространяется под лицензией MIT. Подробнее см. в файле [LICENSE](LICENSE).
 
 ## 👨‍💻 Автор
 

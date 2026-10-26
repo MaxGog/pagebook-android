@@ -1,129 +1,120 @@
 # 🏗 Архитектура PageBook Android
 
-В этом документе описаны архитектурные решения, слои приложения и поток данных. Он предназначен для разработчиков, которые хотят понять кодовую базу или внести вклад в проект.
-
 ## 🎯 Обзор
 
-PageBook Android следует официальным рекомендациям Google по архитектуре приложений и использует паттерн **MVVM (Model-View-ViewModel)** с чётким разделением на **UI Layer** и **Data Layer**. На текущем этапе проект намеренно избегает избыточной сложности (например, Domain Layer с Use Cases), чтобы сохранить скорость разработки и читаемость кода.
+PageBook Android следует официальным рекомендациям Google по архитектуре
+приложений и использует **Clean Architecture** с тремя слоями:
 
-Приложение состоит из трёх независимых функциональных модулей, каждый из которых имеет собственную базу данных Room:
+- **UI Layer** — Compose + ViewModel + UI State.
+- **Domain Layer** — Use Cases, доменные модели, интерфейс репозитория.
+- **Data Layer** — Room, DAO, реализация репозитория, мапперы.
 
-- **Notes** — заметки
-- **Todos** — задачи
-- **Events** — события календаря
+Внедрение зависимостей — **Hilt** (`@HiltAndroidApp`, `@HiltViewModel`, модули в `data/di/`).
+
+Навигация — **type-safe** на основе `@Serializable` destinations (Navigation Compose 2.8+).
+
+> **Статус миграции:** Clean Architecture полностью внедрена для модуля **Notes**.
+> Модули **Todos** и **Events** пока используют упрощённую схему (ViewModel → Repository → DAO)
+> и будут переведены в следующих итерациях.
 
 ## 🛠 Технологический стек
 
-| Компонент               | Технология                                        | Назначение                                                     |
-|-------------------------|---------------------------------------------------|----------------------------------------------------------------|
-| **Язык**                | Kotlin                                            | 100% кода на Kotlin                                            |
-| **UI**                  | Jetpack Compose + Material 3                      | Декларативный интерфейс                                        |
-| **Архитектура**         | MVVM + Repository                                 | Разделение ответственности                                     |
-| **Локальное хранилище** | Room Database                                     | Три независимые БД (`notes_db`, `todo_db`, `event_database`)   |
-| **Асинхронность**       | Kotlin Coroutines & Flow                          | Реактивные потоки данных из Room                               |
-| **DI**                  | Hilt                                              | Модули `NotesModule`, `TodoModule`, `EventModule` в `data/di/` |
-| **Навигация**           | Jetpack Compose Navigation (внутри `CombinedApp`) | Переходы между экранами                                        |
+| Компонент | Технология | Версия |
+| :--- | :--- | :--- |
+| Язык | Kotlin | 2.2.20 |
+| UI | Jetpack Compose + Material 3 | BOM 2026.09.00 |
+| Архитектура | Clean Architecture (UI/Domain/Data) | — |
+| Локальное хранилище | Room | 2.7.2 |
+| Асинхронность | Coroutines & Flow | 1.10.2 |
+| DI | **Hilt** | 2.56.2 |
+| Навигация | Navigation Compose (type-safe) | 2.9.0 |
+| Сборка | AGP | 9.4.1 |
+| SDK | compileSdk 37 / targetSdk 36 / minSdk 28 | — |
+| JDK | Java 21 | — |
 
-> ⚠️ **Важно:** В отличие от многих современных проектов, здесь **не используется Hilt**. Внедрение зависимостей происходит вручную в классе `PageBookApplication`. Это осознанное решение для уменьшения порога входа и упрощения сборки на ранних этапах.
-
-## 📂 Слои и структура пакетов
+## 📂 Структура пакетов
 
 ```
 ru.maxgog.pagebook
-├── PageBookApplication.kt      # Точка входа, ручное DI (создание репозиториев)
-├── MainActivity.kt             # Единственная Activity, хост для Compose
+├── PageBookApplication.kt        # @HiltAndroidApp
+├── MainActivity.kt               # enableEdgeToEdge() + setContent { CombinedAppTheme { ... } }
 │
-├── ui/                         # UI Layer (Compose)
-│   ├── app/                    # CombinedApp — корневой Composable с навигацией
-│   └── theme/                  # Цвета, типографика, тема Material 3
+├── data/
+│   ├── dao/                      # Room DAO (NoteDao, TodoDao, EventDao)
+│   ├── models/                   # Room-сущности (@Entity)
+│   ├── rooms/                    # RoomDatabase (Singleton)
+│   ├── mapper/                   # Note ↔ NoteModel
+│   ├── repository/               # Реализации доменных интерфейсов (NoteRepositoryImpl)
+│   └── di/                       # Hilt-модули (NotesModule, TodoModule, EventModule)
 │
-└── data/ 
-    ├── models/                     # Модели данных (Entity для Room)
-    │   ├── NoteModel.kt
-    │   ├── TodoModel.kt
-    │   └── EventModel.kt
-    │
-    ├── dao/                        # Интерфейсы Room DAO
-    │   ├── NoteDao.kt
-    │   ├── TodoDao.kt
-    │   └── EventDao.kt
-    │
-    ├── rooms/                      # Классы RoomDatabase (Singleton для каждой БД)
-    │   ├── NoteRoomDatabase.kt
-    │   ├── TodoRoomDatabase.kt
-    │   └── EventRoomDatabase.kt
-    │
-    ├── repositories/               # Repository Layer
-    │   ├── NotesRepository.kt
-    │   ├── TodoRepository.kt
-    │   └── EventRepository.kt
-    └── di/                          # Hilt-модули
-        ├── NotesModule.kt
-        ├── TodoModule.kt
-        └── EventModule.kt
+├── domain/
+│   ├── model/                    # Чистые модели (Note)
+│   ├── repository/               # Интерфейсы репозиториев (NoteRepository)
+│   └── usecase/                  # GetAllNotesUseCase, SaveNoteUseCase, ...
+│
+└── ui/
+├── app/                      # CombinedApp — корневой Composable со Scaffold
+├── navigation/               # Destinations.kt, AppNavHost.kt, BottomNavBar.kt
+├── notes/                    # NotesScreen, NotesViewModel, NotesUiState
+├── note_edit/                # NoteEditScreen, NoteEditViewModel, NoteEditUiState
+├── screens/                  # TodoScreen, CalendarScreen, SettingsScreen
+├── items/                    # NoteItem, TodoItem, EventItem
+└── theme/                    # Color, Type, Theme
 ```
 
-### Краткое описание слоёв
-
-**UI Layer (`ui/`)**
-- `CombinedApp()` — корневой Composable, который, предположительно, содержит `NavHost` и связывает экраны.
-- Экраны (Screens) и ViewModels **находятся внутри `ui/app` или будут добавлены туда** по мере развития. ViewModels используют репозитории для получения данных.
-- Тема оформлена в `ui/theme` в соответствии с Material 3.
-
-**Data Layer (`models/`, `dao/`, `rooms/`, `repositories/`)**
-- **Models** — это одновременно и Room-сущности (`@Entity`), и модели данных для UI. На текущем этапе отдельные Domain-модели не выделены.
-- **DAO** предоставляют абстракции над SQL-запросами.
-- **RoomDatabase** — синглтоны, обеспечивающие единственное подключение к каждой БД. Обратите внимание: в `NoteRoomDatabase` используется `fallbackToDestructiveMigration()`, а в других — нет.
-- **Repositories** — тонкая обёртка над DAO. Они скрывают детали источника данных и предоставляют `Flow` или `suspend`-функции для UI-слоя.
-
-## 🔄 Поток данных (Data Flow)
-
-Типичный сценарий: **пользователь открывает список заметок**.
+## 🔄 Поток данных (пример: список заметок)
 
 ```mermaid
 sequenceDiagram
-    participant UI as Compose Screen
-    participant VM as ViewModel (в ui/app)
-    participant Repo as NotesRepository
+    participant UI as NotesScreen
+    participant VM as NotesViewModel
+    participant UC as GetAllNotesUseCase
+    participant Repo as NoteRepository (interface)
+    participant Impl as NoteRepositoryImpl
     participant DAO as NoteDao
-    participant DB as NoteRoomDatabase
+    participant DB as Room
 
-    UI->>VM: Подписка на StateFlow<List<NoteModel>>
-    VM->>Repo: allNotes (Flow)
-    Repo->>DAO: getAll() (Flow)
-    DAO->>DB: SQL-запрос "SELECT * FROM notes"
-    DB-->>DAO: Курсор с данными
-    DAO-->>Repo: Flow<List<NoteModel>>
-    Repo-->>VM: Flow<List<NoteModel>>
-    VM-->>UI: State<List<NoteModel>>
-    UI->>UI: Рендеринг списка
+    UI->>VM: collectAsStateWithLifecycle(uiState)
+    VM->>UC: invoke()
+    UC->>Repo: getAllNotes()
+    Repo-->>Impl: getAllNotes()
+    Impl->>DAO: getAll()
+    DAO->>DB: SELECT * ORDER BY AtCreated DESC
+    DB-->>DAO: Flow<List<NoteModel>>
+    DAO-->>Impl: Flow<List<NoteModel>>
+    Impl-->>Repo: Flow<List<Note>> (через Mapper)
+    Repo-->>UC: Flow<List<Note>>
+    UC-->>VM: Flow<List<Note>>
+    VM-->>UI: StateFlow<NotesUiState.Success>
 ```
 
-1. ViewModel подписывается на `Flow` из репозитория.
-2. Репозиторий делегирует запрос в DAO.
-3. Room автоматически отслеживает изменения в таблице и эмитит новые данные.
-4. Compose перерисовывает UI при поступлении новых данных.
-
-**Для операций записи** (создание заметки): UI вызывает метод ViewModel → ViewModel вызывает `suspend`-функцию репозитория → репозиторий вызывает `insert` в DAO → Room выполняет INSERT в фоновом потоке (корутины).
+**Запись (создание/сохранение заметки):** `NoteEditScreen` → `NoteEditViewModel.save()` →
+`SaveNoteUseCase` (решает insert или update по `id == 0`) → `NoteRepository.updateNote/insertNote` →
+`NoteDao` → Room.
 
 ## 🧭 Ключевые архитектурные решения
 
-| Решение                       | Обоснование                                                                                                                  |
-|-------------------------------|------------------------------------------------------------------------------------------------------------------------------|
-| **Три отдельные базы данных** | Функциональные модули (заметки, задачи, события) изолированы. Это упрощает миграции и позволяет развивать модули независимо. |
-| **Ручной DI вместо Hilt**     | Уменьшает количество зависимостей и boilerplate на старте. Легко заменить на Hilt при росте проекта.                         |
-| **Модели = Entity**           | На текущем этапе отсутствует необходимость в отдельных Domain-моделях, так как UI использует те же поля, что и БД.           |
-| **Отсутствие Use Cases**      | Бизнес-логика проста и не требует дополнительного слоя абстракции. ViewModel напрямую работает с репозиториями.              |
+| Решение | Обоснование |
+| :--- | :--- |
+| **Clean Architecture** | UI не зависит от схемы БД; Use Cases инкапсулируют бизнес-логику; легко тестировать. |
+| **Repository как интерфейс** | Позволяет подменить источник данных (например, добавить сеть) без изменения Domain/UI. |
+| **UI State (sealed interface)** | Явные состояния `Loading`/`Success`/`Error` — не «дёргающийся» UI и предсказуемое поведение. |
+| **Hilt** | Масштабируемый DI, генерируемый на этапе компиляции, интеграция с `@HiltViewModel`. |
+| **Type-safe navigation** | Компилятор проверяет маршруты и аргументы; безопасный рефакторинг. |
+| **`collectAsStateWithLifecycle()`** | Подписка живёт только пока экран видим — экономия ресурсов. |
+| **`contentPadding` в LazyColumn/Grid** | Правильный edge-to-edge: контент прокручивается под барами. |
 
-## 🚀 Планы по развитию архитектуры
+## 🚀 Планы по развитию
 
-- [ ] Выделить **Domain Layer** (Use Cases) при усложнении бизнес-логики (например, синхронизация, офлайн-режим).
-- [x] Внедрить **Hilt** для масштабируемого DI, если количество зависимостей вырастет.
-- [ ] Добавить **отдельные Domain-модели** для отвязки UI от схемы БД.
+- [x] Внедрить **Hilt** для DI.
+- [x] Выделить **Domain Layer** (Use Cases) для заметок.
+- [ ] Перенести **Todos** и **Events** на Clean Architecture.
+- [ ] Добавить **отдельные Domain-модели** для Todos и Events.
 - [ ] Настроить **модуляризацию** (feature-модули) для ускорения сборки.
+- [ ] Unit-тесты для Use Cases и Repository.
 
 ## 📚 Полезные ссылки
 
 - [Guide to App Architecture (Google)](https://developer.android.com/topic/architecture)
-- [Recommendations for Android architecture](https://developer.android.com/topic/architecture/recommendations)
 - [Now in Android (официальный референс)](https://github.com/android/nowinandroid)
+- [Navigation — type safety](https://developer.android.com/guide/navigation/design/type-safety)

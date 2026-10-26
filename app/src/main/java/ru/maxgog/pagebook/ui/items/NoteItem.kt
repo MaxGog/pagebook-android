@@ -6,12 +6,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import ru.maxgog.pagebook.data.models.NoteModel
+import ru.maxgog.pagebook.domain.model.Note
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NoteItem(
-    note: NoteModel,
+    note: Note,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -19,15 +19,13 @@ fun NoteItem(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         onClick = onClick
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
@@ -37,7 +35,6 @@ fun NoteItem(
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis
             )
-
             if (note.content.isNotBlank()) {
                 Text(
                     text = note.content,

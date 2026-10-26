@@ -50,9 +50,10 @@
 ## 🛠 Настройка окружения
 
 ### Требования
-- **Android Studio** Hedgehog (2023.1.1) или новее
-- **JDK 17**
-- **Android SDK 34** (через SDK Manager)
+- **Android Studio** Otter (2026.1) или новее
+- **JDK 21**
+- **Android SDK 37** (через SDK Manager)
+- **Kotlin 2.2.20+**
 - **Git**
 
 ### Шаги
@@ -105,6 +106,12 @@ git checkout -b feature/my-awesome-feature
 - Каждый Composable — отдельная функция в `PascalCase`.
 - Имя файла совпадает с именем основного Composable.
 - Превью-функции — с суффиксом `Preview` и аннотацией `@Preview`.
+
+### Clean Architecture
+- **Domain Layer** не должен зависеть от Android SDK или Room.
+- Domain-модели (`domain/model/`) — чистый Kotlin, без аннотаций Room.
+- ViewModel работает только с Use Cases, а не с репозиториями напрямую.
+- Новые экраны оформляются как `UiState` (sealed interface) + ViewModel + Screen.
 
 ### Проверка стиля
 ```bash

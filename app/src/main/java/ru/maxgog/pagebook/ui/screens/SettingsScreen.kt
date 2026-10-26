@@ -19,7 +19,6 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import ru.maxgog.pagebook.R
 import ru.maxgog.pagebook.ui.theme.AppTheme
-import ru.maxgog.pagebook.ui.theme.SetTransparentSystemBars
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)

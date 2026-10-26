@@ -9,15 +9,17 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import ru.maxgog.pagebook.ui.navigation.AppNavHost
 import ru.maxgog.pagebook.ui.navigation.BottomNavBar
-import ru.maxgog.pagebook.ui.navigation.Screen
+import ru.maxgog.pagebook.ui.navigation.CalendarDestination
+import ru.maxgog.pagebook.ui.navigation.NotesDestination
+import ru.maxgog.pagebook.ui.navigation.TodoDestination
 
 @Composable
 fun CombinedApp(
@@ -25,12 +27,16 @@ fun CombinedApp(
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val currentRoute = navController
+    val currentDestination = navController
         .currentBackStackEntryAsState()
         .value
         ?.destination
-        ?.route
-    val showBottomBar = Screen.bottomNavItems.any { it.route == currentRoute }
+
+    val showBottomBar = currentDestination?.let { destination ->
+        destination.hasRoute<TodoDestination>() ||
+                destination.hasRoute<NotesDestination>() ||
+                destination.hasRoute<CalendarDestination>()
+    } ?: false
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
@@ -47,7 +53,7 @@ fun CombinedApp(
     ) { padding ->
         AppNavHost(
             navController = navController,
-            paddingValues = padding
+            modifier = Modifier.padding(padding)
         )
     }
 }

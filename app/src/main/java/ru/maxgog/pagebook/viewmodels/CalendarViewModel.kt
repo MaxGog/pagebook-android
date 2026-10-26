@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import io.github.boguszpawlowski.composecalendar.kotlinxDateTime.now
 import jakarta.inject.Inject
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -18,8 +17,8 @@ class CalendarViewModel @Inject constructor(
     private val repository: EventRepository
 ) : ViewModel() {
 
-    private val _selectedDate = MutableStateFlow(LocalDate.now())
-    val selectedDate = _selectedDate.asStateFlow()
+    //private val _selectedDate = MutableStateFlow(LocalDate.now())
+    //val selectedDate = _selectedDate.asStateFlow()
 
     private val _events = MutableStateFlow(emptyList<EventModel>())
     val events = _events.asStateFlow()
@@ -27,19 +26,19 @@ class CalendarViewModel @Inject constructor(
     private val _showDialog = MutableStateFlow(false)
     val showDialog = _showDialog.asStateFlow()
 
-    private val _dialogDate = MutableStateFlow(LocalDate.now())
-    val dialogDate = _dialogDate.asStateFlow()
+    //private val _dialogDate = MutableStateFlow(LocalDate.now())
+    //val dialogDate = _dialogDate.asStateFlow()
 
     init {
         loadEvents()
     }
 
     fun onDateSelected(date: LocalDate) {
-        _selectedDate.value = date
+        //_selectedDate.value = date
     }
 
     fun showAddEventDialog(date: LocalDate) {
-        _dialogDate.value = date
+        //_dialogDate.value = date
         _showDialog.value = true
     }
 

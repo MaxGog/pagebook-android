@@ -32,11 +32,11 @@ import ru.maxgog.pagebook.ui.EmptyState
 import ru.maxgog.pagebook.ui.dialogs.AddEventDialog
 import ru.maxgog.pagebook.ui.items.EventItem
 import ru.maxgog.pagebook.ui.theme.AppTheme
-import ru.maxgog.pagebook.ui.theme.SetTransparentSystemBars
 import ru.maxgog.pagebook.viewmodels.CalendarViewModel
 import java.time.YearMonth
 import java.time.format.TextStyle
 import java.util.Locale
+import androidx.compose.ui.platform.LocalLocale
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -54,7 +54,7 @@ fun CalendarScreen(
         firstVisibleMonth = currentMonth
     )
 
-    val showDialog by viewModel.showDialog.collectAsState()
+    /*val showDialog by viewModel.showDialog.collectAsState()
     val dialogDate by viewModel.dialogDate.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
     val events by viewModel.events.collectAsState()
@@ -176,7 +176,7 @@ private fun MonthHeader(yearMonth: YearMonth) {
         Text(
             text = yearMonth.month.getDisplayName(
                 TextStyle.FULL_STANDALONE,
-                Locale.getDefault()
+                LocalLocale.current.platformLocale
             ).replaceFirstChar { it.titlecase() } + " " + yearMonth.year,
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(AppTheme.horizontalPadding)
@@ -232,5 +232,5 @@ private fun Day(
                 )
             }
         }
-    }
+    }*/
 }

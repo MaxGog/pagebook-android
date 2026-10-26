@@ -25,7 +25,6 @@ import ru.maxgog.pagebook.ui.dialogs.AddTodoDialog
 import ru.maxgog.pagebook.ui.dialogs.DateTimePickerDialog
 import ru.maxgog.pagebook.ui.items.TodoItem
 import ru.maxgog.pagebook.ui.theme.AppTheme
-import ru.maxgog.pagebook.ui.theme.SetTransparentSystemBars
 import ru.maxgog.pagebook.viewmodels.TodoViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,7 +40,6 @@ fun TodoScreen(
     var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
     var selectedTime by remember { mutableStateOf<LocalTime?>(null) }
 
-    SetTransparentSystemBars()
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
