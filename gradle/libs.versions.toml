@@ -24,6 +24,7 @@ multidex = "2.0.1"
 coreKtxVersion = "1.19.1"
 kizitonwoseCalendar = "2.10.1"
 mlkitEntityExtraction = "16.0.0-beta6"
+datastore = "1.2.1"
 
 [libraries]
 # AndroidX Core
@@ -87,6 +88,8 @@ androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-co
 androidx-junit-ktx = { group = "androidx.test.ext", name = "junit-ktx", version.ref = "junitKtx" }
 multidex = { module = "androidx.multidex:multidex", version.ref = "multidex" }
 core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtxVersion" }
+
+androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

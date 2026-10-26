@@ -77,9 +77,11 @@ dependencies {
     // --- AndroidX Core ---
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.livedata.ktx)
+    implementation("androidx.appcompat:appcompat:1.7.0")
 
     // --- Compose ---
     implementation(platform(libs.androidx.compose.bom))

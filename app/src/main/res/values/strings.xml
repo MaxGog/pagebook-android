@@ -37,4 +37,7 @@
     <string name="language_title">Language</string>
     <string name="app_description_title">About app</string>
     <string name="app_description">PageBook is a convenient app for storing and organizing pages with notes, bookmarks, and other materials. Developed with love in Kotlin.</string>
+    <string name="about">About</string>
+    <string name="version">3.0.0</string>
+    <string name="author">MaxGog (aka Max Upshur)</string>
 </resources>

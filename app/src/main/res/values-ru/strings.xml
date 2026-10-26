@@ -37,4 +37,7 @@
     <string name="language_title">Язык</string>
     <string name="app_description_title">О приложении</string>
     <string name="app_description">PageBook - это удобное приложение для хранения и организации страниц с заметками, закладками и другими материалами. Разработано с любовью на Kotlin.</string>
+    <string name="about">About</string>
+    <string name="version">3.0.0</string>
+    <string name="author">MaxGog (aka Max Upshur)</string>
 </resources>
