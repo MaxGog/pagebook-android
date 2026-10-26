@@ -1,108 +1,95 @@
 [versions]
-accompanistSystemuicontroller = "0.36.0"
 agp = "9.4.1"
-compose = "2.7.0"
-composecalendar = "1.4.0"
-composeVersion = "2.10.1"
-foundation = "1.8.3"
-googleMaterial = "1.12.0"
-gradle = "9.4.1"
-hiltAndroid = "2.56.2"
-hiltAndroidCompiler = "2.56.2"
-hiltAndroidCompilerVersion = "2.57.1"
-hiltAndroidTesting = "2.60.1"
-hiltNavigationCompose = "1.2.0"
-kotlin = "2.2.10"
+kotlin = "2.2.20"
+ksp = "2.2.20-2.0.4"
+composeBom = "2026.09.00"
 coreKtx = "1.16.0"
-junit = "4.13.2"
-junitVersion = "1.2.1"
-espressoCore = "3.6.1"
-kotlinGradlePlugin = "2.2.10"
-kotlinxCoroutinesAndroid = "1.10.2"
-lifecycleRuntimeKtx = "2.9.1"
 activityCompose = "1.10.1"
-composeBom = "2025.06.01"
-lifecycleRuntimeKtxVersion = "2.9.1"
-lifecycleViewmodelCompose = "2.9.1"
-material = "1.8.3"
-material3 = "1.3.2"
-material3Version = "1.2.0"
-material3WindowSizeClass = "1.3.2"
-materialIconsCore = "1.7.8"
-materialIconsExtended = "1.7.8"
-materialVersion = "1.8.3"
+lifecycle = "2.9.1"
 navigationCompose = "2.9.0"
-navigationComposeVersion = "2.9.0"
-richeditorCompose = "1.2.1"
-roomRuntime = "2.7.2"
-roomCompiler = "2.7.2"
-roomKtx = "2.7.2"
-runtimeLivedata = "1.8.3"
+room = "2.7.2"
+hilt = "2.56.2"
+hiltNavigationCompose = "1.2.0"
+kotlinxCoroutines = "1.10.2"
+kotlinxDatetime = "0.6.2"
 threetenabp = "1.4.9"
+composeCalendar = "1.4.0"
+richeditorCompose = "1.0.0-rc09"
+junit = "4.13.2"
 truth = "1.4.5"
-truthVersion = "1.7.0"
-ui = "1.8.3"
-uiToolingPreview = "1.8.3"
+androidxJunit = "1.2.1"
+espressoCore = "3.6.1"
 junitKtx = "1.3.0"
+multidex = "2.0.1"
+coreKtxVersion = "1.19.1"
+kizitonwoseCalendar = "2.10.1"
 
 [libraries]
-accompanist-systemuicontroller = { module = "com.google.accompanist:accompanist-systemuicontroller", version.ref = "accompanistSystemuicontroller" }
-androidx-compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
-androidx-compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
-androidx-foundation = { module = "androidx.compose.foundation:foundation", version.ref = "foundation" }
-androidx-hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
-androidx-lifecycle-livedata-ktx = { module = "androidx.lifecycle:lifecycle-livedata-ktx", version.ref = "lifecycleRuntimeKtxVersion" }
-androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycleRuntimeKtx" }
-androidx-lifecycle-viewmodel-compose-v262 = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycleViewmodelCompose" }
-androidx-material = { module = "androidx.compose.material:material", version.ref = "material" }
-androidx-material-icons-core = { module = "androidx.compose.material:material-icons-core", version.ref = "materialIconsCore" }
-androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIconsExtended" }
-androidx-material-v150 = { module = "androidx.compose.material:material", version.ref = "materialVersion" }
-androidx-material3-v120 = { module = "androidx.compose.material3:material3", version.ref = "material3Version" }
-androidx-material3-window-size-class1 = { module = "androidx.compose.material3:material3-window-size-class", version.ref = "material3WindowSizeClass" }
-androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
-androidx-navigation-compose-v270 = { module = "androidx.navigation:navigation-compose", version.ref = "navigationComposeVersion" }
-androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "roomKtx" }
-androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "roomCompiler" }
-androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomRuntime" }
+# AndroidX Core
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
-androidx-runtime-livedata = { module = "androidx.compose.runtime:runtime-livedata", version.ref = "runtimeLivedata" }
-androidx-truth = { module = "androidx.test.ext:truth", version.ref = "truthVersion" }
-compose = { module = "com.kizitonwose.calendar:compose", version.ref = "compose" }
-compose-v2101 = { module = "com.kizitonwose.calendar:compose", version.ref = "composeVersion" }
-composecalendar = { module = "io.github.boguszpawlowski.composecalendar:composecalendar", version.ref = "composecalendar" }
-dagger-hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hiltAndroid" }
-gradle = { module = "com.android.tools.build:gradle", version.ref = "gradle" }
-hilt-android-compiler = { module = "com.google.dagger:hilt-android-compiler", version.ref = "hiltAndroidCompiler" }
-hilt-android-compiler-v2571 = { module = "com.google.dagger:hilt-android-compiler", version.ref = "hiltAndroidCompilerVersion" }
-hilt-android-testing = { module = "com.google.dagger:hilt-android-testing", version.ref = "hiltAndroidTesting" }
-junit = { group = "junit", name = "junit", version.ref = "junit" }
-androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
-androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
-androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+
+# Lifecycle
+androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
+androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+androidx-lifecycle-livedata-ktx = { module = "androidx.lifecycle:lifecycle-livedata-ktx", version.ref = "lifecycle" }
+
+# Compose
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 androidx-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
-androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
-androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+androidx-foundation = { module = "androidx.compose.foundation:foundation" }
+androidx-runtime-livedata = { module = "androidx.compose.runtime:runtime-livedata" }
+
+# Material Design
+androidx-material = { module = "androidx.compose.material:material" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
-kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlinGradlePlugin" }
-kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutinesAndroid" }
-kotlinx-datetime = { module = "io.github.boguszpawlowski.composecalendar:kotlinx-datetime", version.ref = "composecalendar" }
-material = { module = "com.google.android.material:material", version.ref = "googleMaterial" }
-material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" }
-richeditor-compose = { module = "com.mohamedrejeb.richeditor:richeditor-compose", version.ref = "richeditorCompose" }
+androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
+androidx-material-icons-core = { module = "androidx.compose.material:material-icons-core" }
+androidx-material3-window-size = { module = "androidx.compose.material3:material3-window-size-class" }
+material = { module = "com.google.android.material:material", version = "1.12.0" }
+
+# Navigation
+androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
+
+# Room
+androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
+androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
+androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
+
+# Hilt
+dagger-hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
+hilt-android-compiler = { module = "com.google.dagger:hilt-android-compiler", version.ref = "hilt" }
+androidx-hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
+hilt-android-testing = { module = "com.google.dagger:hilt-android-testing", version.ref = "hilt" }
+
+# Coroutines & Date/Time
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
+kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
 threetenabp = { module = "com.jakewharton.threetenabp:threetenabp", version.ref = "threetenabp" }
+
+# Other UI
+composecalendar = { module = "io.github.boguszpawlowski.composecalendar:composecalendar", version.ref = "composeCalendar" }
+richeditor-compose = { module = "com.mohamedrejeb.richeditor:richeditor-compose", version.ref = "richeditorCompose" }
+kizitonwose-calendar-compose = { module = "com.kizitonwose.calendar:compose", version.ref = "kizitonwoseCalendar" }
+
+# Testing
+junit = { group = "junit", name = "junit", version.ref = "junit" }
 truth = { module = "com.google.truth:truth", version.ref = "truth" }
-ui = { module = "androidx.compose.ui:ui", version.ref = "ui" }
-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview", version.ref = "uiToolingPreview" }
+androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJunit" }
+androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 androidx-junit-ktx = { group = "androidx.test.ext", name = "junit-ktx", version.ref = "junitKtx" }
+multidex = { module = "androidx.multidex:multidex", version.ref = "multidex" }
+core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtxVersion" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
