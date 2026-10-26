@@ -7,9 +7,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import ru.maxgog.pagebook.ui.screens.CalendarScreen
 import ru.maxgog.pagebook.ui.screens.SettingsScreen
-import ru.maxgog.pagebook.ui.screens.TodoScreen
-import ru.maxgog.pagebook.ui.screens.note_edit.NoteEditScreen
-import ru.maxgog.pagebook.ui.screens.notes.NotesScreen
+import ru.maxgog.pagebook.ui.note_edit.NoteEditScreen
+import ru.maxgog.pagebook.ui.notes.NotesScreen
+import ru.maxgog.pagebook.ui.tasks.TaskEditScreen
+import ru.maxgog.pagebook.ui.tasks.TaskListScreen
 
 @Composable
 fun AppNavHost(
@@ -18,10 +19,15 @@ fun AppNavHost(
 ) {
     NavHost(
         navController = navController,
-        startDestination = TodoDestination,
+        startDestination = TaskListDestination,
         modifier = modifier
     ) {
-        composable<TodoDestination> { TodoScreen() }
+        composable<TaskListDestination> {
+            TaskListScreen(
+                onAddTask = { navController.navigate(TaskEditDestination()) }
+            )
+        }
+
         composable<CalendarDestination> { CalendarScreen() }
 
         composable<NotesDestination> {
@@ -42,6 +48,10 @@ fun AppNavHost(
 
         composable<SettingsDestination> {
             SettingsScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable<TaskEditDestination> {
+            TaskEditScreen(onBack = { navController.popBackStack() })
         }
     }
 }

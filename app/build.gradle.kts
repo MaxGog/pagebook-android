@@ -122,6 +122,7 @@ dependencies {
     implementation(libs.composecalendar)
     implementation(libs.richeditor.compose)
     implementation(libs.kizitonwose.calendar.compose)
+    implementation(libs.mlkit.entity.extraction)
 
     // --- Testing ---
     testImplementation(libs.junit)

@@ -19,7 +19,7 @@ import ru.maxgog.pagebook.ui.navigation.AppNavHost
 import ru.maxgog.pagebook.ui.navigation.BottomNavBar
 import ru.maxgog.pagebook.ui.navigation.CalendarDestination
 import ru.maxgog.pagebook.ui.navigation.NotesDestination
-import ru.maxgog.pagebook.ui.navigation.TodoDestination
+import ru.maxgog.pagebook.ui.navigation.TaskListDestination
 
 @Composable
 fun CombinedApp(
@@ -33,7 +33,7 @@ fun CombinedApp(
         ?.destination
 
     val showBottomBar = currentDestination?.let { destination ->
-        destination.hasRoute<TodoDestination>() ||
+        destination.hasRoute< TaskListDestination>() ||
                 destination.hasRoute<NotesDestination>() ||
                 destination.hasRoute<CalendarDestination>()
     } ?: false

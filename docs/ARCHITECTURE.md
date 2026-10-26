@@ -53,13 +53,13 @@ ru.maxgog.pagebook
 │   └── usecase/                  # GetAllNotesUseCase, SaveNoteUseCase, ...
 │
 └── ui/
-├── app/                      # CombinedApp — корневой Composable со Scaffold
-├── navigation/               # Destinations.kt, AppNavHost.kt, BottomNavBar.kt
-├── notes/                    # NotesScreen, NotesViewModel, NotesUiState
-├── note_edit/                # NoteEditScreen, NoteEditViewModel, NoteEditUiState
-├── screens/                  # TodoScreen, CalendarScreen, SettingsScreen
-├── items/                    # NoteItem, TodoItem, EventItem
-└── theme/                    # Color, Type, Theme
+    ├── app/                      # CombinedApp — корневой Composable со Scaffold
+    ├── navigation/               # Destinations.kt, AppNavHost.kt, BottomNavBar.kt
+    ├── notes/                    # NotesScreen, NotesViewModel, NotesUiState
+    ├── note_edit/                # NoteEditScreen, NoteEditViewModel, NoteEditUiState
+    ├── screens/                  # TodoScreen, CalendarScreen, SettingsScreen
+    ├── items/                    # NoteItem, TodoItem, EventItem
+    └── theme/                    # Color, Type, Theme
 ```
 
 ## 🔄 Поток данных (пример: список заметок)

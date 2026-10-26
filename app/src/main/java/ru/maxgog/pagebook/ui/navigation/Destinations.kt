@@ -4,8 +4,10 @@ import kotlinx.serialization.Serializable
 
 // Главные экраны (для нижней навигации)
 @Serializable
-data object TodoDestination
+data object TaskListDestination
 
+@Serializable
+data class TaskEditDestination(val taskId: Int? = null)
 @Serializable
 data object NotesDestination
 

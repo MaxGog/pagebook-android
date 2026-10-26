@@ -22,7 +22,7 @@ fun BottomNavBar(navController: NavController) {
 
     NavigationBar {
         val items = listOf(
-            Triple(TodoDestination, Icons.Default.Checklist, R.string.todo_list),
+            Triple(TaskListDestination, Icons.Default.Checklist, R.string.todo_list),
             Triple(NotesDestination, Icons.AutoMirrored.Filled.Note, R.string.notes),
             Triple(CalendarDestination, Icons.Default.CalendarToday, R.string.calendar)
         )
