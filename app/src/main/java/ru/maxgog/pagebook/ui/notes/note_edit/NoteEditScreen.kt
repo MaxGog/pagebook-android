@@ -1,6 +1,8 @@
 package ru.maxgog.pagebook.ui.notes.note_edit
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -21,6 +23,9 @@ import com.mohamedrejeb.richeditor.model.RichTextState
 import com.mohamedrejeb.richeditor.model.rememberRichTextState
 import com.mohamedrejeb.richeditor.ui.material3.RichTextEditor
 import ru.maxgog.pagebook.R
+import ru.maxgog.pagebook.ui.components.CreateTagDialog
+import ru.maxgog.pagebook.ui.components.TagChip
+import ru.maxgog.pagebook.ui.components.TagPickerDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,20 +34,32 @@ fun NoteEditScreen(
     viewModel: NoteEditViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val allTags by viewModel.allTags.collectAsStateWithLifecycle()
+    val isSaved by viewModel.isSaved.collectAsStateWithLifecycle()
     val richTextState = rememberRichTextState()
 
-    // Извлекаем заметку из состояния (null, если ещё грузимся или это новая заметка)
+    var showTagPicker by remember { mutableStateOf(false) }
+    var showCreateTag by remember { mutableStateOf(false) }
+
     val currentNote = (uiState as? NoteEditUiState.Editing)?.note
+    val currentTags = when (val s = uiState) {
+        is NoteEditUiState.Editing -> s.tags
+        is NoteEditUiState.NewNote -> s.selectedTags
+        else -> emptyList()
+    }
     val isLoading = uiState is NoteEditUiState.Loading
     val isNewNote = uiState is NoteEditUiState.NewNote
 
-    // Локальное состояние полей инициализируется, когда заметка загрузилась
     var titleState by remember(currentNote?.id) {
         mutableStateOf(currentNote?.title ?: "")
     }
 
     LaunchedEffect(currentNote?.id) {
         currentNote?.let { richTextState.setHtml(it.content) }
+    }
+
+    LaunchedEffect(isSaved) {
+        if (isSaved) onBack()
     }
 
     val saveEnabled = titleState.isNotBlank() &&
@@ -67,11 +84,11 @@ fun NoteEditScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showTagPicker = true }) {
+                        Icon(Icons.Default.Label, contentDescription = "Теги")
+                    }
                     IconButton(
-                        onClick = {
-                            viewModel.save(titleState, richTextState.toHtml())
-                            onBack()
-                        },
+                        onClick = { viewModel.save(titleState, richTextState.toHtml()) },
                         enabled = saveEnabled
                     ) {
                         Icon(
@@ -82,12 +99,7 @@ fun NoteEditScreen(
                         )
                     }
                     if (currentNote != null) {
-                        IconButton(
-                            onClick = {
-                                viewModel.delete()
-                                onBack()
-                            }
-                        ) {
+                        IconButton(onClick = { viewModel.delete() }) {
                             Icon(
                                 imageVector = Icons.Default.Delete,
                                 contentDescription = stringResource(R.string.delete),
@@ -102,69 +114,100 @@ fun NoteEditScreen(
                 )
             )
         },
-        bottomBar = {
-            FormattingToolbar(state = richTextState)
-        },
+        bottomBar = { FormattingToolbar(state = richTextState) },
         contentWindowInsets = WindowInsets(0)
     ) { padding ->
         when {
-            isLoading -> {
-                Box(
-                    modifier = Modifier.fillMaxSize().padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
+            isLoading -> Box(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentAlignment = Alignment.Center
+            ) { CircularProgressIndicator() }
+
+            uiState is NoteEditUiState.Error -> Box(
+                modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = (uiState as NoteEditUiState.Error).message,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyLarge
+                )
             }
 
-            uiState is NoteEditUiState.Error -> {
-                Box(
-                    modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = (uiState as NoteEditUiState.Error).message,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                }
-            }
+            else -> Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 8.dp)
+            ) {
+                TextField(
+                    value = titleState,
+                    onValueChange = { titleState = it },
+                    placeholder = { Text(stringResource(R.string.title)) },
+                    textStyle = MaterialTheme.typography.headlineSmall,
+                    singleLine = true,
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                        focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                        unfocusedIndicatorColor = MaterialTheme.colorScheme.outlineVariant
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-            else -> {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .padding(horizontal = 16.dp)
-                        .padding(top = 8.dp)
-                ) {
-                    TextField(
-                        value = titleState,
-                        onValueChange = { titleState = it },
-                        placeholder = { Text(stringResource(R.string.title)) },
-                        textStyle = MaterialTheme.typography.headlineSmall,
-                        singleLine = true,
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-                            focusedIndicatorColor = MaterialTheme.colorScheme.primary,
-                            unfocusedIndicatorColor = MaterialTheme.colorScheme.outlineVariant
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(Modifier.height(8.dp))
-
-                    RichTextEditor(
-                        state = richTextState,
+                if (currentTags.isNotEmpty()) {
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f),
-                        placeholder = { Text(stringResource(R.string.content)) }
-                    )
+                            .horizontalScroll(rememberScrollState())
+                            .padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        currentTags.forEach { tag ->
+                            TagChip(
+                                tag = tag,
+                                selected = true,
+                                onDelete = { viewModel.toggleTag(tag) }
+                            )
+                        }
+                    }
                 }
+
+                Spacer(Modifier.height(8.dp))
+
+                RichTextEditor(
+                    state = richTextState,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    placeholder = { Text(stringResource(R.string.content)) }
+                )
             }
         }
+    }
+
+    if (showTagPicker) {
+        TagPickerDialog(
+            allTags = allTags,
+            selectedTags = currentTags,
+            onToggle = viewModel::toggleTag,
+            onCreateTag = {
+                showTagPicker = false
+                showCreateTag = true
+            },
+            onDismiss = { showTagPicker = false }
+        )
+    }
+
+    if (showCreateTag) {
+        CreateTagDialog(
+            onDismiss = { showCreateTag = false },
+            onConfirm = { name, color ->
+                viewModel.createAndToggleTag(name, color)
+                showCreateTag = false
+            }
+        )
     }
 }
 
@@ -174,7 +217,6 @@ fun FormattingToolbar(
     modifier: Modifier = Modifier
 ) {
     val currentStyle = state.currentSpanStyle
-
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -183,42 +225,28 @@ fun FormattingToolbar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .navigationBarsPadding()               // ← отступ под навбар
+                .navigationBarsPadding()
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             IconToggleButton(
                 checked = currentStyle.fontWeight == FontWeight.Bold,
-                onCheckedChange = {
-                    state.toggleSpanStyle(SpanStyle(fontWeight = FontWeight.Bold))
-                }
-            ) {
-                Icon(Icons.Default.FormatBold, contentDescription = null)
-            }
+                onCheckedChange = { state.toggleSpanStyle(SpanStyle(fontWeight = FontWeight.Bold)) }
+            ) { Icon(Icons.Default.FormatBold, contentDescription = null) }
 
             IconToggleButton(
                 checked = currentStyle.fontStyle == FontStyle.Italic,
-                onCheckedChange = {
-                    state.toggleSpanStyle(SpanStyle(fontStyle = FontStyle.Italic))
-                }
-            ) {
-                Icon(Icons.Default.FormatItalic, contentDescription = null)
-            }
+                onCheckedChange = { state.toggleSpanStyle(SpanStyle(fontStyle = FontStyle.Italic)) }
+            ) { Icon(Icons.Default.FormatItalic, contentDescription = null) }
 
             IconToggleButton(
                 checked = currentStyle.textDecoration == TextDecoration.Underline,
                 onCheckedChange = {
                     state.toggleSpanStyle(SpanStyle(textDecoration = TextDecoration.Underline))
                 }
-            ) {
-                Icon(Icons.Default.FormatUnderlined, contentDescription = null)
-            }
+            ) { Icon(Icons.Default.FormatUnderlined, contentDescription = null) }
 
-            IconButton(
-                onClick = {
-                    state.toggleSpanStyle(SpanStyle(fontSize = 24.sp))
-                }
-            ) {
+            IconButton(onClick = { state.toggleSpanStyle(SpanStyle(fontSize = 24.sp)) }) {
                 Icon(Icons.Default.FormatSize, contentDescription = null)
             }
         }

@@ -3,6 +3,7 @@ package ru.maxgog.pagebook.data.dao
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 import ru.maxgog.pagebook.data.models.TaskModel
+import ru.maxgog.pagebook.data.models.TaskWithTags
 
 @Dao
 interface TaskDao {
@@ -23,4 +24,12 @@ interface TaskDao {
 
     @Delete
     suspend fun delete(task: TaskModel)
+
+    @Transaction
+    @Query("SELECT * FROM tasks ORDER BY IsCompleted ASC, AtCreated DESC")
+    fun getAllWithTags(): Flow<List<TaskWithTags>>
+
+    @Transaction
+    @Query("SELECT * FROM tasks WHERE id = :id")
+    suspend fun getWithTagsById(id: Int): TaskWithTags?
 }

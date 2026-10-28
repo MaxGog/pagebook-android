@@ -14,9 +14,9 @@ class EventRepositoryImpl @Inject constructor(
 ) : EventRepository {
 
     override fun getAllEvents(): Flow<List<Event>> =
-        eventDao.getAllEvents().map { models -> models.map { it.toDomain() } }
+        eventDao.getAllWithTags().map { list -> list.map { it.toDomain() } }
 
-    override suspend fun insertEvent(event: Event) =
+    override suspend fun insertEvent(event: Event): Long =
         eventDao.insert(event.toEntity())
 
     override suspend fun updateEvent(event: Event) =

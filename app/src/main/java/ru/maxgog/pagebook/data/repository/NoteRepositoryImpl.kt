@@ -14,10 +14,10 @@ class NoteRepositoryImpl @Inject constructor(
 ) : NoteRepository {
 
     override fun getAllNotes(): Flow<List<Note>> =
-        noteDao.getAll().map { models -> models.map { it.toDomain() } }
+        noteDao.getAllWithTags().map { list -> list.map { it.toDomain() } }
 
     override suspend fun getNoteById(id: Int): Note? =
-        noteDao.getById(id)?.toDomain()
+        noteDao.getWithTagsById(id)?.toDomain()
 
     override suspend fun insertNote(note: Note): Long =
         noteDao.insert(note.toEntity())

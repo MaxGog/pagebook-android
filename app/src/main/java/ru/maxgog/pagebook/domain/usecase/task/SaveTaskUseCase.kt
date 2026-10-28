@@ -7,8 +7,12 @@ import ru.maxgog.pagebook.domain.repository.TaskRepository
 class SaveTaskUseCase @Inject constructor(
     private val repository: TaskRepository
 ) {
-    suspend operator fun invoke(task: Task) {
-        if (task.id == 0) repository.insertTask(task)
-        else repository.updateTask(task)
+    suspend operator fun invoke(task: Task): Long {
+        return if (task.id == 0) {
+            repository.insertTask(task)
+        } else {
+            repository.updateTask(task)
+            task.id.toLong()
+        }
     }
 }

@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ru.maxgog.pagebook.domain.model.Note
+import ru.maxgog.pagebook.ui.components.CompactTagChip
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,6 +44,23 @@ fun NoteItem(
                     maxLines = 10,
                     overflow = TextOverflow.Ellipsis
                 )
+            }
+            if (note.tags.isNotEmpty()) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    note.tags.take(3).forEach { tag ->
+                        CompactTagChip(tag = tag)
+                    }
+                    if (note.tags.size > 3) {
+                        Text(
+                            text = "+${note.tags.size - 3}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
         }
     }

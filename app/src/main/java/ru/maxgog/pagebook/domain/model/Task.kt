@@ -9,5 +9,6 @@ data class Task(
     val hasReminder: Boolean = false,
     val reminderTime: Long? = null,
     val isAddedToCalendar: Boolean = false,
-    val noteId: Int? = null
+    val noteId: Int? = null,
+    val tags: List<Tag> = emptyList()
 )

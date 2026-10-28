@@ -39,6 +39,8 @@ fun CalendarScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val allTags by viewModel.allTags.collectAsStateWithLifecycle()
+    val pendingTags by viewModel.pendingTags.collectAsStateWithLifecycle()
 
     val currentMonth = remember { YearMonth.now() }
     val startMonth = remember { currentMonth.minusMonths(12) }
@@ -117,6 +119,10 @@ fun CalendarScreen(
     if (uiState.showAddDialog) {
         AddEventDialog(
             date = uiState.selectedDate,
+            allTags = allTags,
+            selectedTags = pendingTags,
+            onToggleTag = viewModel::toggleTag,
+            onCreateTag = viewModel::createAndToggleTag,
             onDismiss = { viewModel.hideAddDialog() },
             onConfirm = { title, description, date, time ->
                 viewModel.addEvent(title, description, date, time)

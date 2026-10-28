@@ -12,11 +12,12 @@ import javax.inject.Inject
 class TaskRepositoryImpl @Inject constructor(
     private val taskDao: TaskDao
 ) : TaskRepository {
+
     override fun getAllTasks(): Flow<List<Task>> =
-        taskDao.getAllTasks().map { it.map { model -> model.toDomain() } }
+        taskDao.getAllWithTags().map { list -> list.map { it.toDomain() } }
 
     override fun getTasksByNoteId(noteId: Int): Flow<List<Task>> =
-        taskDao.getTasksByNoteId(noteId).map { it.map { model -> model.toDomain() } }
+        taskDao.getTasksByNoteId(noteId).map { list -> list.map { it.toDomain() } }
 
     override suspend fun insertTask(task: Task): Long =
         taskDao.insert(task.toEntity())
@@ -28,5 +29,5 @@ class TaskRepositoryImpl @Inject constructor(
         taskDao.delete(task.toEntity())
 
     override suspend fun getTaskById(id: Int): Task? =
-        taskDao.getById(id)?.toDomain()
+        taskDao.getWithTagsById(id)?.toDomain()
 }

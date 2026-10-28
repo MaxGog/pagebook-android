@@ -74,6 +74,8 @@ android {
 }
 
 dependencies {
+    implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.compose.runtime)
     // --- AndroidX Core ---
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

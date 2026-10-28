@@ -5,7 +5,7 @@ import ru.maxgog.pagebook.domain.model.Event
 
 interface EventRepository {
     fun getAllEvents(): Flow<List<Event>>
-    suspend fun insertEvent(event: Event)
+    suspend fun insertEvent(event: Event): Long
     suspend fun updateEvent(event: Event)
     suspend fun deleteEvent(event: Event)
 }

@@ -25,6 +25,8 @@ coreKtxVersion = "1.19.1"
 kizitonwoseCalendar = "2.10.1"
 mlkitEntityExtraction = "16.0.0-beta6"
 datastore = "1.2.1"
+runtime = "1.12.1"
+foundation = "1.12.1"
 
 [libraries]
 # AndroidX Core
@@ -90,6 +92,8 @@ multidex = { module = "androidx.multidex:multidex", version.ref = "multidex" }
 core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtxVersion" }
 
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
+androidx-compose-runtime = { group = "androidx.compose.runtime", name = "runtime", version.ref = "runtime" }
+androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
