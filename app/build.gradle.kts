@@ -127,6 +127,7 @@ dependencies {
     implementation(libs.richeditor.compose)
     implementation(libs.kizitonwose.calendar.compose)
     implementation(libs.mlkit.entity.extraction)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
 
     // --- Testing ---
     testImplementation(libs.junit)

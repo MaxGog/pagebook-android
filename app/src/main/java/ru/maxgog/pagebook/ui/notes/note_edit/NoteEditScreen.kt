@@ -36,7 +36,11 @@ fun NoteEditScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val allTags by viewModel.allTags.collectAsStateWithLifecycle()
     val isSaved by viewModel.isSaved.collectAsStateWithLifecycle()
+    val taskCreating by viewModel.taskCreating.collectAsStateWithLifecycle()
+    val snackbarMessage by viewModel.snackbarMessage.collectAsStateWithLifecycle()
     val richTextState = rememberRichTextState()
+
+    val snackbarHostState = remember { SnackbarHostState() }
 
     var showTagPicker by remember { mutableStateOf(false) }
     var showCreateTag by remember { mutableStateOf(false) }
@@ -49,6 +53,7 @@ fun NoteEditScreen(
     }
     val isLoading = uiState is NoteEditUiState.Loading
     val isNewNote = uiState is NoteEditUiState.NewNote
+    val canCreateTask = currentNote != null && !taskCreating   // 🆕
 
     var titleState by remember(currentNote?.id) {
         mutableStateOf(currentNote?.title ?: "")
@@ -60,6 +65,13 @@ fun NoteEditScreen(
 
     LaunchedEffect(isSaved) {
         if (isSaved) onBack()
+    }
+
+    LaunchedEffect(snackbarMessage) {
+        snackbarMessage?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            viewModel.clearSnackbar()
+        }
     }
 
     val saveEnabled = titleState.isNotBlank() &&
@@ -84,6 +96,24 @@ fun NoteEditScreen(
                     }
                 },
                 actions = {
+                    if (currentNote != null) {
+                        IconButton(
+                            onClick = { viewModel.createTaskFromCurrentNote() },
+                            enabled = canCreateTask
+                        ) {
+                            if (taskCreating) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.AddTask,
+                                    contentDescription = "Создать задачу"
+                                )
+                            }
+                        }
+                    }
                     IconButton(onClick = { showTagPicker = true }) {
                         Icon(Icons.Default.Label, contentDescription = "Теги")
                     }
@@ -115,6 +145,7 @@ fun NoteEditScreen(
             )
         },
         bottomBar = { FormattingToolbar(state = richTextState) },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         contentWindowInsets = WindowInsets(0)
     ) { padding ->
         when {

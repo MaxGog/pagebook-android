@@ -106,6 +106,23 @@
   `ExposedDropdownMenuBox` (в стиле CharacterBook).
   `ThemePreference`, `LanguagePreference`, `SettingsSection`.
 
+**Создание задач из заметок (UI)**
+- **Кнопка `AddTask` в `TopAppBar` `NoteEditScreen`** — только для
+  сохранённой заметки (`Editing`). Для `NewNote` скрыта, так как нет `noteId`.
+- **`NoteEditViewModel.createTaskFromCurrentNote()`** — берёт `title` +
+  `content` текущей заметки, вызывает `CreateTaskFromNoteUseCase`, привязывает
+  задачу к заметке (`noteId = current.note.id`) и сохраняет через `SaveTaskUseCase`.
+- **`taskCreating: StateFlow<Boolean>`** — пока идёт создание, кнопка
+  показывает `CircularProgressIndicator` и disabled (защита от двойного клика).
+- **`snackbarMessage: StateFlow<String?>`** + `SnackbarHost` в `Scaffold` —
+  обратная связь: «Задача создана» / «Задача создана с напоминанием» /
+  «Ошибка: …».
+- **`stripHtml` перенесён в `CreateTaskFromNoteUseCase`** — HTML из
+  `RichTextEditor` очищается от тегов и entities перед передачей в ML Kit,
+  иначе он не находит даты.
+- **`EntityExtractor` кеширован** через `by lazy` + `@Singleton` — не создаётся
+  новый клиент на каждый вызов.
+
 **Навигация и UI**
 - **Type-safe navigation**: `Destinations.kt` с `@Serializable` объектами
   и классами данных.
@@ -239,10 +256,18 @@
   но фактически используется только в `SettingsViewModel`; нарушение
   Clean Architecture (data → ui) отмечено, будет исправлено переносом
   в `domain/model/`.
+- **`CreateTaskFromNoteUseCase`: ML Kit API** — `EntityExtraction.EntityType.TYPE_DATE_TIME`
+    → `Entity.TYPE_DATE_TIME`, `entity.timestampMillis` →
+    `entity.asDateTimeEntity()?.timestampMillis`. Класса `EntityType` в Android SDK
+    нет (это iOS-API), а `timestampMillis` есть только у `DateTimeEntity`.
+- **Выбор ближайшей будущей даты** — вместо `firstOrNull { ... }` используется
+  `mapNotNull { asDateTimeEntity()?.timestampMillis }.filter { > now }.minOrNull()`.
+  В тексте «Сегодня в 10:00 и завтра в 18:00» ML Kit возвращает две сущности,
+  раньше бралась первая (уже прошедшая), теперь — ближайшая будущая.
+- **`try/catch` вокруг `annotate()`** — при отсутствии сети / нескачанной модели
+  задача создаётся **без напоминания**, приложение не крашится.
 
 ### Planned
-- UI для `CreateTaskFromNoteUseCase` в `NoteEditScreen` (UseCase готов,
-  но не подключён).
 - **Фильтрация списков по тегам** в Notes / Tasks / Calendar
   (горизонтальный `LazyRow` с `FilterChip` над списком).
 - **Редактирование существующих тегов** (имя/цвет) — `UpdateTagUseCase` готов,

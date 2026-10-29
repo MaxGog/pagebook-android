@@ -21,6 +21,8 @@ import ru.maxgog.pagebook.domain.usecase.tag.CreateTagUseCase
 import ru.maxgog.pagebook.domain.usecase.tag.GetAllTagsUseCase
 import ru.maxgog.pagebook.domain.usecase.tag.GetTagsForNoteUseCase
 import ru.maxgog.pagebook.domain.usecase.tag.ToggleTagOnNoteUseCase
+import ru.maxgog.pagebook.domain.usecase.task.CreateTaskFromNoteUseCase
+import ru.maxgog.pagebook.domain.usecase.task.SaveTaskUseCase
 import javax.inject.Inject
 
 @HiltViewModel
@@ -33,7 +35,9 @@ class NoteEditViewModel @Inject constructor(
     private val getTagsForNote: GetTagsForNoteUseCase,
     private val toggleTagOnNote: ToggleTagOnNoteUseCase,
     private val createTag: CreateTagUseCase,
-    private val tagRepository: TagRepository
+    private val tagRepository: TagRepository,
+    private val createTaskFromNote: CreateTaskFromNoteUseCase,
+    private val saveTask: SaveTaskUseCase
 ) : ViewModel() {
 
     private val noteId: Int? = savedStateHandle.get<Int>("noteId")
@@ -44,11 +48,16 @@ class NoteEditViewModel @Inject constructor(
     private val _isSaved = MutableStateFlow(false)
     val isSaved: StateFlow<Boolean> = _isSaved.asStateFlow()
 
+    private val _taskCreating = MutableStateFlow(false)
+    val taskCreating: StateFlow<Boolean> = _taskCreating.asStateFlow()
+
+    private val _snackbarMessage = MutableStateFlow<String?>(null)
+    val snackbarMessage: StateFlow<String?> = _snackbarMessage.asStateFlow()
+
     val allTags: StateFlow<List<Tag>> = getAllTags()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     init {
-        // 1) Быстро выставляем Editing/NewNote/Error
         viewModelScope.launch {
             _uiState.value = if (noteId == null) {
                 NoteEditUiState.NewNote()
@@ -59,7 +68,6 @@ class NoteEditViewModel @Inject constructor(
             }
         }
 
-        // 2) Отдельная подписка на теги — реактивно обновляет Editing
         noteId?.let { id ->
             viewModelScope.launch {
                 getTagsForNote(id).collect { tags ->
@@ -130,4 +138,43 @@ class NoteEditViewModel @Inject constructor(
             }
         }
     }
+
+    fun createTaskFromCurrentNote() {
+        val current = _uiState.value as? NoteEditUiState.Editing ?: return
+        val title = current.note.title.ifBlank { "Задача из заметки" }
+        val plainContent = stripHtml(current.note.content)
+
+        viewModelScope.launch {
+            _taskCreating.value = true
+            try {
+                val task = createTaskFromNote(
+                    noteContent = plainContent,
+                    noteTitle = title
+                )
+
+                saveTask(task.copy(noteId = current.note.id))
+
+                _snackbarMessage.value = "Задача создана" +
+                        if (task.hasReminder) " с напоминанием" else ""
+            } catch (e: Exception) {
+                _snackbarMessage.value = "Ошибка: ${e.message ?: "не удалось создать задачу"}"
+            } finally {
+                _taskCreating.value = false
+            }
+        }
+    }
+
+    fun clearSnackbar() {
+        _snackbarMessage.value = null
+    }
 }
+
+private fun stripHtml(html: String): String =
+    html.replace(Regex("<[^>]*>"), " ")
+        .replace(Regex("&nbsp;"), " ")
+        .replace(Regex("&amp;"), "&")
+        .replace(Regex("&lt;"), "<")
+        .replace(Regex("&gt;"), ">")
+        .replace(Regex("&quot;"), "\"")
+        .replace(Regex("\\s+"), " ")
+        .trim()

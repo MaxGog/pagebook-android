@@ -387,19 +387,31 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant UI as NoteEditScreen
-    participant VM as NoteEditViewModel
-    participant UC as CreateTaskFromNoteUseCase
-    participant ML as ML Kit Entity Extraction
-    participant Save as SaveTaskUseCase
+  participant UI as NoteEditScreen
+  participant VM as NoteEditViewModel
+  participant UC as CreateTaskFromNoteUseCase
+  participant ML as ML Kit Entity Extraction
+  participant Save as SaveTaskUseCase
+  participant DB as PageBookDatabase
 
-    UI->>VM: createTaskFromCurrentNote()
-    VM->>UC: invoke(noteContent, noteTitle)
-    UC->>ML: annotate(text, filter=TYPE_DATE_TIME)
-    ML-->>UC: List<EntityAnnotation>
-    UC-->>VM: Task (с заполненным reminderTime)
-    VM->>Save: invoke(task)
-    Save-->>VM: (insert в tasks)
+  UI->>VM: createTaskFromCurrentNote()
+  Note over VM: taskCreating = true
+  VM->>UC: invoke(noteContent (HTML), noteTitle)
+  UC->>UC: stripHtml(noteContent) → plainText
+  UC->>ML: annotate(plainText, filter = {Entity.TYPE_DATE_TIME})
+  ML-->>UC: List<EntityAnnotation>
+  UC->>UC: filter { type == TYPE_DATE_TIME }
+        .mapNotNull { asDateTimeEntity()?.timestampMillis }
+        .filter { > now }.minOrNull()  // ближайшая будущая
+  UC-->>VM: Task(title, description, hasReminder, reminderTime)
+  VM->>VM: task.copy(noteId = current.note.id)
+  VM->>Save: invoke(task)
+  Save->>DB: INSERT INTO tasks (NoteId = ...)
+  DB-->>Save: savedId
+  Save-->>VM: savedId
+  VM->>VM: taskCreating = false
+  VM->>VM: snackbarMessage = "Задача создана [с напоминанием]"
+  VM-->>UI: LaunchedEffect(snackbarMessage) → snackbarHostState.showSnackbar
 ```
 
 ## 🎨 Настройки (DataStore)
@@ -452,8 +464,14 @@ sequenceDiagram
 - **Связь с заметками** — `noteId` (nullable). `TaskEditScreen` показывает
   `«Связана с заметкой #N»`, если `noteId != null`.
 - **Сортировка** — `IsCompleted ASC, AtCreated DESC`.
-- **Создание из заметки** — `CreateTaskFromNoteUseCase` через ML Kit
-  (UI пока не подключён — в roadmap).
+- **Создание из заметки** — кнопка `Icons.Default.AddTask` в `TopAppBar`
+  `NoteEditScreen` (только для сохранённой заметки). Поток:
+  `NoteEditViewModel.createTaskFromCurrentNote()` →
+  `CreateTaskFromNoteUseCase` (ML Kit извлекает дату → `reminderTime`) →
+  `saveTask(task.copy(noteId = current.note.id))` →
+  `snackbarMessage = "Задача создана [с напоминанием]"`.
+  Пока идёт создание — `taskCreating = true`, кнопка показывает
+  `CircularProgressIndicator`.
 - **Теги на карточке** — до 3 `CompactTagChip` + `+N` с эмодзи.
 
 ### Calendar
@@ -479,7 +497,8 @@ sequenceDiagram
 - [x] Добавить **сквозную систему тегов** (7 цветов, many-to-many).
 - [x] Добавить **эмодзи-кастомизацию тегов** (200+ эмодзи в 10 категориях).
 - [x] Добавить `DataStore` для настроек (тема, язык).
-- [ ] Реализовать UI для `CreateTaskFromNoteUseCase` в `NoteEditScreen`.
+- [x] Реализовать UI для `CreateTaskFromNoteUseCase` в `NoteEditScreen`
+  (кнопка `AddTask` + Snackbar + `taskCreating`).
 - [ ] Фильтрация списков по тегам (Notes / Tasks / Calendar).
 - [ ] Редактирование существующих тегов (имя/цвет/эмодзи) в UI.
 - [ ] **Поиск по эмодзи** в `EmojiPickerDialog` (TextField + фильтрация).
