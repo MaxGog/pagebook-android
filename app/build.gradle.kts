@@ -18,7 +18,7 @@ android {
         minSdk = 28
         targetSdk = 37
         versionCode = 6
-        versionName = "2.1"
+        versionName = "2.2"
 
         testInstrumentationRunner = "ru.maxgog.pagebook.HiltTestRunner"
     }
