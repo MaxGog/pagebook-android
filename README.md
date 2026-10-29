@@ -5,7 +5,7 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.2.20-blue.svg)](https://kotlinlang.org)
 [![Compose](https://img.shields.io/badge/Jetpack%20Compose-BOM%202026.09.00-blue.svg)](https://developer.android.com/jetpack/compose)
 [![AGP](https://img.shields.io/badge/AGP-9.4.1-green.svg)](https://developer.android.com/build/releases/gradle-plugin)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.2.0--dev-orange.svg)](CHANGELOG.md)
 
 ## 🌟 О проекте
@@ -44,6 +44,7 @@ PageBook — это нативное Android-приложение для раб�
 - Переключение темы: **System / Light / Dark** (сохраняется в `DataStore`)
 - Переключение языка: **Русский / English** через `AppCompatDelegate`
 - **Реактивное** применение без перезапуска приложения
+- **Material 3 Expressive** дизайн: группы в карточках, пояснительный текст
 
 ### 🏷️ Сквозные теги с эмодзи
 Один тег — на заметке, задаче и событии одновременно. Каждый тег можно
@@ -51,15 +52,21 @@ PageBook — это нативное Android-приложение для раб�
 на 200+ штук** в 10 категориях. Реализовано через many-to-many
 (junction-таблицы) в единой `PageBookDatabase`.
 
+### 📱 Адаптивный UI
+- **Телефоны**: `NavigationBar` + отдельные экраны
+- **Планшеты / Chromebook**: `NavigationRail` + `ListDetailPaneScaffold` (два пена рядом)
+- Автоматическое переключение через `WindowSizeClass`
+
 ## 🛠 Технологический стек
 
 - **💚 100% Kotlin** — Kotlin 2.2.20
 - **🎨 Jetpack Compose** — BOM 2026.09.00, Material 3 Expressive
 - **💾 Room Database** — единая `PageBookDatabase` (7 entities, version 3)
-- **⚙️ DataStore Preferences** — хранение настроек (тема, язык)
-- **🔄 Coroutines & Flow** — реактивное программирование
+- **⚙️ DataStore Preferences** — хранение настроек (тема)
+- **🌐 AppCompatDelegate** — смена языка (per-app language preferences)
+- **🔄 Coroutines & Flow** — реактивное программирование + `Channel` для one-shot событий
 - **🧩 Hilt** — внедрение зависимостей (`@Binds` + `@Provides`)
-- **🧭 Navigation Compose** — type-safe навигация через `@Serializable` destinations
+- **🧭 Navigation Compose** — type-safe навигация + adaptive layouts
 - **🤖 ML Kit Entity Extraction** — извлечение дат из текста заметок
 - **📐 Material Design 3** + edge-to-edge
 - **🏗 Clean Architecture** — UI / Domain / Data
@@ -71,7 +78,7 @@ graph TD
    A[UI Layer<br/>Compose + ViewModel + UiState] --> B[Domain Layer<br/>Use Cases + доменные модели]
    B --> C[Data Layer<br/>Repository Impl + Mappers + Room + DataStore]
    C --> D[(PageBookDatabase - Room<br/>notes, tasks, events, tags, cross-refs)]
-   C --> F[(DataStore<br/>theme, language)]
+   C --> F[(DataStore<br/>theme)]
    C -.-> E[(Remote - Future)]
 ```
 
@@ -133,18 +140,18 @@ app/src/main/java/ru/maxgog/pagebook/
 │                       #   DeleteTagUseCase, GetTagsFor{Note,Task,Event}UseCase,
 │                       #   ToggleTagOn{Note,Task,Event}UseCase
 ├── ui/
-│   ├── app/            # CombinedApp (корневой Scaffold)
+│   ├── app/            # CombinedApp (NavigationSuiteScaffold)
 │   ├── navigation/     # Destinations, AppNavHost, BottomNavBar
 │   ├── components/     # TagChip, CompactTagChip, CreateTagDialog,
-│   │                   #   TagPickerDialog, EmojiCatalog, EmojiPickerDialog
-│   ├── notes/          # NotesScreen, NotesViewModel, NotesUiState, NoteItem
-│   ├── note_edit/      # NoteEditScreen, NoteEditViewModel, NoteEditUiState
+│   │                   #   TagPickerDialog, EmojiCatalog, EmojiPickerDialog,
+│   │                   #   OverflowMenu
+│   ├── notes/          # NotesScreen, NoteEditScreen + ViewModels + UiStates + NoteItem
 │   ├── tasks/          # TaskListScreen, TaskEditScreen, TaskItem,
-│   │                   #   TaskListViewModel, TaskEditViewModel
+│   │                   #   TaskListDetailPane + ViewModels + UiStates
 │   ├── calendar/       # CalendarScreen, AddEventDialog, DateTimePickerDialog,
 │   │                   #   EventItem, CalendarViewModel
-│   ├── settings/       # SettingsScreen, SettingsViewModel,
-│   │                   #   ThemePreference, LanguagePreference, SettingsSection
+│   ├── settings/       # SettingsScreen, SettingsViewModel, AppLanguage,
+│   │                   #   ThemePreference, LanguagePreference, SettingsGroup
 │   └── theme/          # Color, Type, Theme, AppTheme (enum ThemeMode)
 ├── Converters.kt
 ├── PageBookApplication.kt
@@ -158,7 +165,7 @@ app/src/main/java/ru/maxgog/pagebook/
 | **Notes** 📝    | Rich-text заметки, адаптивная сетка, ML Kit для извлечения дат, **теги с эмодзи**   | Compose, Room, RichEditor, ML Kit   |
 | **Tasks** ✅    | Задачи с напоминаниями, связь с заметками (`noteId`), сортировка, **теги с эмодзи** | Compose, StateFlow, Room            |
 | **Calendar** 🗓️ | События по датам, реактивное обновление, автоскролл, **теги с эмодзи**              | Compose, kizitonwose Calendar, Room |
-| **Settings** ⚙️ | Тема (System/Light/Dark), язык (ru/en) через DataStore                              | Compose, DataStore, AppCompat       |
+| **Settings** ⚙️ | Тема (System/Light/Dark), язык (ru/en) через AppCompatDelegate                      | Compose, DataStore, AppCompat       |
 | **Tags** 🏷️     | Сквозные теги: 7 цветов macOS + **200+ эмодзи** в 10 категориях                     | Room (@Relation + @Junction), Hilt  |
 
 ## 🏷️ Система тегов
@@ -221,9 +228,14 @@ app/src/main/java/ru/maxgog/pagebook/
 - [x] **ML Kit** для извлечения дат из заметок
 - [x] **Единая PageBookDatabase** с `ForeignKey` между сущностями
 - [x] **Сквозные теги** (7 цветов, many-to-many) во всех модулях
-- [x] **DataStore** для настроек (тема + язык)
+- [x] **DataStore** для настроек (тема)
 - [x] **Эмодзи-кастомизация тегов** (200+ эмодзи в 10 категориях)
 - [x] **UI для создания задач из заметок** 🤖 (кнопка `AddTask` в `NoteEditScreen`)
+- [x] **Material 3 Expressive** (настройки, карточки, `OverflowMenu`)
+- [x] **Адаптивный UI** (`NavigationSuiteScaffold`, `ListDetailPaneScaffold`)
+- [x] **Смена языка** через `AppCompatDelegate` (единый источник правды)
+- [x] **One-Shot Events** через `Channel` для навигации
+- [ ] **Смена языка на Android < 13** (требуется `AppCompatActivity`)
 - [ ] **Фильтрация списков по тегам** в Notes / Tasks / Calendar
 - [ ] **Редактирование существующих тегов** (имя/цвет/эмодзи)
 - [ ] **Счётчик использования тега** (сколько заметок/задач/событий)
@@ -237,6 +249,10 @@ app/src/main/java/ru/maxgog/pagebook/
 - [ ] **Unit-тесты** для Use Cases и Repository
 - [ ] **WorkManager** для напоминаний о задачах
 - [ ] **Kotlin Multiplatform** для общей бизнес-логики
+
+## 📄 Лицензия
+
+Этот проект распространяется под лицензией **GNU Affero General Public License v3.0 (AGPL-3.0)**. Подробнее см. в файле [GNU AFFERO GENERAL PUBLIC.txt](GNU%20AFFERO%20GENERAL%20PUBLIC.txt) или на [официальном сайте FSF](https://www.gnu.org/licenses/agpl-3.0.html).
 
 ## 👨‍💻 Автор
 

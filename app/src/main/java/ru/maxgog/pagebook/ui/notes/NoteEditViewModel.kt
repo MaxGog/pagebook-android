@@ -1,15 +1,18 @@
-package ru.maxgog.pagebook.ui.notes.note_edit
+package ru.maxgog.pagebook.ui.notes
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import ru.maxgog.pagebook.R
 import ru.maxgog.pagebook.domain.model.Note
 import ru.maxgog.pagebook.domain.model.Tag
 import ru.maxgog.pagebook.domain.model.TagColor
@@ -45,14 +48,14 @@ class NoteEditViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<NoteEditUiState>(NoteEditUiState.Loading)
     val uiState: StateFlow<NoteEditUiState> = _uiState.asStateFlow()
 
-    private val _isSaved = MutableStateFlow(false)
-    val isSaved: StateFlow<Boolean> = _isSaved.asStateFlow()
+    private val _events = Channel<NoteEditEvent>(Channel.BUFFERED)
+    val events = _events.receiveAsFlow()
 
     private val _taskCreating = MutableStateFlow(false)
     val taskCreating: StateFlow<Boolean> = _taskCreating.asStateFlow()
 
-    private val _snackbarMessage = MutableStateFlow<String?>(null)
-    val snackbarMessage: StateFlow<String?> = _snackbarMessage.asStateFlow()
+    private val _snackbarMessageRes = MutableStateFlow<Int?>(null)
+    val snackbarMessageRes: StateFlow<Int?> = _snackbarMessageRes.asStateFlow()
 
     val allTags: StateFlow<List<Tag>> = getAllTags()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -99,12 +102,7 @@ class NoteEditViewModel @Inject constructor(
     fun createAndToggleTag(name: String, color: TagColor, emoji: String? = null) {
         viewModelScope.launch {
             val tagId = createTag(name, color, emoji)
-            val tag = Tag(
-                id = tagId.toInt(),
-                name = name.trim(),
-                colorHex = color.hex,
-                emoji = emoji
-            )
+            val tag = Tag(id = tagId.toInt(), name = name.trim(), colorHex = color.hex, emoji = emoji)
             toggleTag(tag)
         }
     }
@@ -117,15 +115,17 @@ class NoteEditViewModel @Inject constructor(
                 else -> Note(title = title, content = content)
             }
 
-            val savedId = saveNote(note)
-
-            if (current is NoteEditUiState.NewNote) {
-                current.selectedTags.forEach { tag ->
-                    tagRepository.addTagToNote(savedId.toInt(), tag.id)
+            try {
+                val savedId = saveNote(note)
+                if (current is NoteEditUiState.NewNote) {
+                    current.selectedTags.forEach { tag ->
+                        tagRepository.addTagToNote(savedId.toInt(), tag.id)
+                    }
                 }
+                _events.send(NoteEditEvent.Saved)
+            } catch (e: Exception) {
+                null
             }
-
-            _isSaved.value = true
         }
     }
 
@@ -134,30 +134,29 @@ class NoteEditViewModel @Inject constructor(
         if (current is NoteEditUiState.Editing) {
             viewModelScope.launch {
                 deleteNote(current.note)
-                _isSaved.value = true
+                _events.send(NoteEditEvent.Deleted)
             }
         }
     }
 
     fun createTaskFromCurrentNote() {
         val current = _uiState.value as? NoteEditUiState.Editing ?: return
-        val title = current.note.title.ifBlank { "Задача из заметки" }
-        val plainContent = stripHtml(current.note.content)
 
         viewModelScope.launch {
             _taskCreating.value = true
             try {
                 val task = createTaskFromNote(
-                    noteContent = plainContent,
-                    noteTitle = title
+                    noteContent = current.note.content,
+                    noteTitle = current.note.title
                 )
-
                 saveTask(task.copy(noteId = current.note.id))
 
-                _snackbarMessage.value = "Задача создана" +
-                        if (task.hasReminder) " с напоминанием" else ""
+                _snackbarMessageRes.value = if (task.hasReminder)
+                    R.string.task_created_with_reminder
+                else
+                    R.string.task_created
             } catch (e: Exception) {
-                _snackbarMessage.value = "Ошибка: ${e.message ?: "не удалось создать задачу"}"
+                _snackbarMessageRes.value = R.string.task_creation_error
             } finally {
                 _taskCreating.value = false
             }
@@ -165,16 +164,6 @@ class NoteEditViewModel @Inject constructor(
     }
 
     fun clearSnackbar() {
-        _snackbarMessage.value = null
+        _snackbarMessageRes.value = null
     }
 }
-
-private fun stripHtml(html: String): String =
-    html.replace(Regex("<[^>]*>"), " ")
-        .replace(Regex("&nbsp;"), " ")
-        .replace(Regex("&amp;"), "&")
-        .replace(Regex("&lt;"), "<")
-        .replace(Regex("&gt;"), ">")
-        .replace(Regex("&quot;"), "\"")
-        .replace(Regex("\\s+"), " ")
-        .trim()

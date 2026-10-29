@@ -4,10 +4,12 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.maxgog.pagebook.domain.model.Tag
@@ -36,29 +38,37 @@ class TaskEditViewModel @Inject constructor(
     private val tagRepository: TagRepository
 ) : ViewModel() {
 
-    private val taskId: Int? = savedStateHandle.get<Int>("taskId")?.takeIf { it != 0 }
+    private var taskId: Int? = savedStateHandle.get<Int>("taskId")?.takeIf { it != 0 }
 
     private val _uiState = MutableStateFlow<TaskEditUiState>(TaskEditUiState.Loading)
     val uiState: StateFlow<TaskEditUiState> = _uiState.asStateFlow()
 
-    private val _isSaved = MutableStateFlow(false)
-    val isSaved: StateFlow<Boolean> = _isSaved.asStateFlow()
+    private val _events = Channel<TaskEditEvent>(Channel.BUFFERED)
+    val events = _events.receiveAsFlow()
 
     val allTags: StateFlow<List<Tag>> = getAllTags()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    init {
+    init { load() }
+
+    fun setTaskId(id: Int) {
+        if (taskId == id) return
+        taskId = id
+        load()
+    }
+
+    private fun load() {
+        val id = taskId
         viewModelScope.launch {
-            _uiState.value = if (taskId == null) {
+            _uiState.value = if (id == null) {
                 TaskEditUiState.NewTask()
             } else {
-                val task = getTaskById(taskId)
+                val task = getTaskById(id)
                 if (task == null) TaskEditUiState.Error("Задача не найдена")
                 else TaskEditUiState.Editing(task = task, tags = task.tags)
             }
         }
-
-        taskId?.let { id ->
+        if (id != null) {
             viewModelScope.launch {
                 getTagsForTask(id).collect { tags ->
                     val current = _uiState.value
@@ -89,22 +99,12 @@ class TaskEditViewModel @Inject constructor(
     fun createAndToggleTag(name: String, color: TagColor, emoji: String? = null) {
         viewModelScope.launch {
             val tagId = createTag(name, color, emoji)
-            val tag = Tag(
-                id = tagId.toInt(),
-                name = name.trim(),
-                colorHex = color.hex,
-                emoji = emoji
-            )
+            val tag = Tag(id = tagId.toInt(), name = name.trim(), colorHex = color.hex, emoji = emoji)
             toggleTag(tag)
         }
     }
 
-    fun save(
-        title: String,
-        description: String,
-        reminderTime: Long?,
-        noteId: Int? = null
-    ) {
+    fun save(title: String, description: String, reminderTime: Long?, noteId: Int? = null) {
         viewModelScope.launch {
             val current = _uiState.value
             val task = when (current) {
@@ -124,15 +124,16 @@ class TaskEditViewModel @Inject constructor(
                 )
             }
 
-            val savedId = saveTask(task)
-
-            if (current is TaskEditUiState.NewTask) {
-                current.selectedTags.forEach { tag ->
-                    tagRepository.addTagToTask(savedId.toInt(), tag.id)
+            try {
+                val savedId = saveTask(task)
+                if (current is TaskEditUiState.NewTask) {
+                    current.selectedTags.forEach { tag ->
+                        tagRepository.addTagToTask(savedId.toInt(), tag.id)
+                    }
                 }
+                _events.send(TaskEditEvent.Saved)
+            } catch (e: Exception) {
             }
-
-            _isSaved.value = true
         }
     }
 
@@ -141,7 +142,7 @@ class TaskEditViewModel @Inject constructor(
         if (current is TaskEditUiState.Editing) {
             viewModelScope.launch {
                 deleteTask(current.task)
-                _isSaved.value = true
+                _events.send(TaskEditEvent.Deleted)
             }
         }
     }

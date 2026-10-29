@@ -12,9 +12,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.toColorInt
+import ru.maxgog.pagebook.R
 import ru.maxgog.pagebook.domain.model.Tag
 
 @Composable
@@ -49,7 +51,7 @@ fun TagChip(
             {
                 Icon(
                     Icons.Default.Close,
-                    contentDescription = "Удалить тег",
+                    contentDescription = stringResource(R.string.delete_tag),
                     modifier = Modifier
                         .size(FilterChipDefaults.IconSize)
                         .clickable { onDelete() },

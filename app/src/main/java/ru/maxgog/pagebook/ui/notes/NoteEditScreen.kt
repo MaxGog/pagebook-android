@@ -1,8 +1,7 @@
-package ru.maxgog.pagebook.ui.notes.note_edit
+package ru.maxgog.pagebook.ui.notes
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -10,6 +9,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontStyle
@@ -27,7 +28,7 @@ import ru.maxgog.pagebook.ui.components.CreateTagDialog
 import ru.maxgog.pagebook.ui.components.TagChip
 import ru.maxgog.pagebook.ui.components.TagPickerDialog
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun NoteEditScreen(
     onBack: () -> Unit,
@@ -35,12 +36,12 @@ fun NoteEditScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val allTags by viewModel.allTags.collectAsStateWithLifecycle()
-    val isSaved by viewModel.isSaved.collectAsStateWithLifecycle()
     val taskCreating by viewModel.taskCreating.collectAsStateWithLifecycle()
-    val snackbarMessage by viewModel.snackbarMessage.collectAsStateWithLifecycle()
+    val snackbarMessageRes by viewModel.snackbarMessageRes.collectAsStateWithLifecycle()
     val richTextState = rememberRichTextState()
 
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
     var showTagPicker by remember { mutableStateOf(false) }
     var showCreateTag by remember { mutableStateOf(false) }
@@ -53,7 +54,7 @@ fun NoteEditScreen(
     }
     val isLoading = uiState is NoteEditUiState.Loading
     val isNewNote = uiState is NoteEditUiState.NewNote
-    val canCreateTask = currentNote != null && !taskCreating   // 🆕
+    val canCreateTask = currentNote != null && !taskCreating
 
     var titleState by remember(currentNote?.id) {
         mutableStateOf(currentNote?.title ?: "")
@@ -63,13 +64,17 @@ fun NoteEditScreen(
         currentNote?.let { richTextState.setHtml(it.content) }
     }
 
-    LaunchedEffect(isSaved) {
-        if (isSaved) onBack()
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                NoteEditEvent.Saved, NoteEditEvent.Deleted -> onBack()
+            }
+        }
     }
 
-    LaunchedEffect(snackbarMessage) {
-        snackbarMessage?.let { msg ->
-            snackbarHostState.showSnackbar(msg)
+    LaunchedEffect(snackbarMessageRes) {
+        snackbarMessageRes?.let { resId ->
+            snackbarHostState.showSnackbar(context.getString(resId))
             viewModel.clearSnackbar()
         }
     }
@@ -109,13 +114,13 @@ fun NoteEditScreen(
                             } else {
                                 Icon(
                                     imageVector = Icons.Default.AddTask,
-                                    contentDescription = "Создать задачу"
+                                    contentDescription = stringResource(R.string.create_task)
                                 )
                             }
                         }
                     }
                     IconButton(onClick = { showTagPicker = true }) {
-                        Icon(Icons.Default.Label, contentDescription = "Теги")
+                        Icon(Icons.Default.Label, contentDescription = stringResource(R.string.tags))
                     }
                     IconButton(
                         onClick = { viewModel.save(titleState, richTextState.toHtml()) },
@@ -170,30 +175,40 @@ fun NoteEditScreen(
                     .fillMaxSize()
                     .padding(padding)
                     .padding(horizontal = 16.dp)
-                    .padding(top = 8.dp)
             ) {
-                TextField(
+                // 📝 Заголовок — без рамки, крупным шрифтом (как в Google Keep)
+                BasicTextField(
                     value = titleState,
                     onValueChange = { titleState = it },
-                    placeholder = { Text(stringResource(R.string.title)) },
-                    textStyle = MaterialTheme.typography.headlineSmall,
-                    singleLine = true,
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-                        focusedIndicatorColor = MaterialTheme.colorScheme.primary,
-                        unfocusedIndicatorColor = MaterialTheme.colorScheme.outlineVariant
+                    textStyle = MaterialTheme.typography.headlineSmall.copy(
+                        color = MaterialTheme.colorScheme.onSurface
                     ),
-                    modifier = Modifier.fillMaxWidth()
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    decorationBox = { innerTextField ->
+                        Box {
+                            if (titleState.isEmpty()) {
+                                Text(
+                                    text = stringResource(R.string.title),
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                )
+                            }
+                            innerTextField()
+                        }
+                    }
                 )
 
+                // 🏷️ Теги — FlowRow без Card, чипы переносятся на новые строки
                 if (currentTags.isNotEmpty()) {
-                    Row(
+                    FlowRow(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            .padding(bottom = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         currentTags.forEach { tag ->
                             TagChip(
@@ -205,8 +220,7 @@ fun NoteEditScreen(
                     }
                 }
 
-                Spacer(Modifier.height(8.dp))
-
+                // 📄 Контент на весь оставшийся экран
                 RichTextEditor(
                     state = richTextState,
                     modifier = Modifier
@@ -242,6 +256,11 @@ fun NoteEditScreen(
     }
 }
 
+/**
+ * Тулбар форматирования. `.windowInsetsPadding(navigationBars.union(ime))`
+ * — когда клавиатура закрыта, отступ = высота навбара; когда открыта —
+ * высота клавиатуры. Тулбар всегда оказывается над клавиатурой.
+ */
 @Composable
 fun FormattingToolbar(
     state: RichTextState,
@@ -256,7 +275,9 @@ fun FormattingToolbar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .navigationBarsPadding()
+                .windowInsetsPadding(
+                    WindowInsets.navigationBars.union(WindowInsets.ime)
+                )
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {

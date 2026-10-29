@@ -16,11 +16,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.maxgog.pagebook.R
 import ru.maxgog.pagebook.ui.EmptyState
+import ru.maxgog.pagebook.ui.components.OverflowMenu
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaskListScreen(
     onAddTask: () -> Unit,
+    onTaskClick: (Int) -> Unit,
+    onSettingsClick: () -> Unit,
     viewModel: TaskListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -28,7 +31,10 @@ fun TaskListScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text(stringResource(R.string.todo_list)) }
+                title = { Text(stringResource(R.string.todo_list)) },
+                actions = {
+                    OverflowMenu(onSettingsClick = onSettingsClick)
+                }
             )
         },
         floatingActionButton = {
@@ -59,14 +65,14 @@ fun TaskListScreen(
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = innerPadding, // edge-to-edge
+                        contentPadding = innerPadding,
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         items(state.tasks, key = { it.id }) { task ->
                             TaskItem(
                                 task = task,
                                 onToggle = { viewModel.toggleCompleted(task) },
-                                onDelete = { viewModel.delete(task) }
+                                onClick = { onTaskClick(task.id) }
                             )
                         }
                     }

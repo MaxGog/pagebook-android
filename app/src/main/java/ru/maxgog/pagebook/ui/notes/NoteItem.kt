@@ -1,15 +1,19 @@
 package ru.maxgog.pagebook.ui.notes
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ru.maxgog.pagebook.domain.model.Note
 import ru.maxgog.pagebook.ui.components.CompactTagChip
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun NoteItem(
     note: Note,
@@ -18,7 +22,7 @@ fun NoteItem(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium,
+        shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         ),
@@ -36,30 +40,24 @@ fun NoteItem(
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis
             )
+
             if (note.content.isNotBlank()) {
                 Text(
-                    text = note.content,
+                    text = AnnotatedString.fromHtml(note.content),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 10,
                     overflow = TextOverflow.Ellipsis
                 )
             }
+
             if (note.tags.isNotEmpty()) {
-                Row(
+                FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    maxLines = 2
                 ) {
-                    note.tags.take(3).forEach { tag ->
-                        CompactTagChip(tag = tag)
-                    }
-                    if (note.tags.size > 3) {
-                        Text(
-                            text = "+${note.tags.size - 3}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    note.tags.forEach { tag -> CompactTagChip(tag = tag) }
                 }
             }
         }

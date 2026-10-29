@@ -13,10 +13,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import ru.maxgog.pagebook.domain.model.TagColor
 import androidx.core.graphics.toColorInt
+import ru.maxgog.pagebook.R
+import ru.maxgog.pagebook.domain.model.TagColor
 
 @Composable
 fun CreateTagDialog(
@@ -30,10 +32,9 @@ fun CreateTagDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Новый тег") },
+        title = { Text(stringResource(R.string.new_tag)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                // Превью
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -43,7 +44,7 @@ fun CreateTagDialog(
                         modifier = Modifier
                             .size(44.dp)
                             .clip(CircleShape)
-                            .background(Color(android.graphics.Color.parseColor(selectedColor.hex)).copy(alpha = 0.2f)),
+                            .background(Color(selectedColor.hex.toColorInt()).copy(alpha = 0.2f)),
                         contentAlignment = Alignment.Center
                     ) {
                         if (selectedEmoji != null) {
@@ -58,7 +59,7 @@ fun CreateTagDialog(
                         }
                     }
                     Text(
-                        text = name.ifBlank { "Название тега" },
+                        text = name.ifBlank { stringResource(R.string.tag_name_hint) },
                         style = MaterialTheme.typography.titleMedium,
                         color = if (name.isBlank())
                             MaterialTheme.colorScheme.onSurfaceVariant
@@ -69,7 +70,7 @@ fun CreateTagDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Название") },
+                    label = { Text(stringResource(R.string.tag_name)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -81,12 +82,12 @@ fun CreateTagDialog(
                     Icon(Icons.Default.EmojiEmotions, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        if (selectedEmoji != null) "Эмодзи: $selectedEmoji"
-                        else "Добавить эмодзи"
+                        if (selectedEmoji != null) stringResource(R.string.emoji_prefix, selectedEmoji!!)
+                        else stringResource(R.string.add_emoji)
                     )
                 }
-                
-                Text("Цвет", style = MaterialTheme.typography.titleSmall)
+
+                Text(stringResource(R.string.color), style = MaterialTheme.typography.titleSmall)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -112,9 +113,9 @@ fun CreateTagDialog(
             TextButton(
                 onClick = { onConfirm(name, selectedColor, selectedEmoji) },
                 enabled = name.isNotBlank()
-            ) { Text("Создать") }
+            ) { Text(stringResource(R.string.create)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } }
     )
 
     if (showEmojiPicker) {

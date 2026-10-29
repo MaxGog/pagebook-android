@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.staggeredgrid.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -16,6 +15,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.maxgog.pagebook.R
 import ru.maxgog.pagebook.ui.EmptyState
+import ru.maxgog.pagebook.ui.components.OverflowMenu
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,9 +32,7 @@ fun NotesScreen(
             CenterAlignedTopAppBar(
                 title = { Text(stringResource(R.string.notes)) },
                 actions = {
-                    IconButton(onClick = onSettingsClick) {
-                        Icon(Icons.Default.Settings, contentDescription = null)
-                    }
+                    OverflowMenu(onSettingsClick = onSettingsClick)
                 }
             )
         },

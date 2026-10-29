@@ -7,15 +7,12 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.maxgog.pagebook.R
-import ru.maxgog.pagebook.ui.theme.AppTheme
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,14 +29,13 @@ fun SettingsScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.back)
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer
                 )
             )
         }
@@ -48,49 +44,59 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(bottom = 16.dp, start = 16.dp, end = 16.dp)
         ) {
+            // --- Секция "Тема" ---
             item {
                 SettingsSection(title = stringResource(R.string.theme_title)) {
-                    ThemePreference(
-                        selected = uiState.themeMode,
-                        onSelect = viewModel::setTheme
-                    )
+                    SettingsGroup {
+                        ThemePreference(
+                            selected = uiState.themeMode,
+                            onSelect = viewModel::setTheme
+                        )
+                    }
                 }
             }
 
+            // --- Секция "Язык" ---
             item {
                 SettingsSection(title = stringResource(R.string.language_title)) {
-                    LanguagePreference(
-                        selected = uiState.language,
-                        onSelect = viewModel::setLanguage
-                    )
+                    SettingsGroup {
+                        LanguagePreference(
+                            selected = uiState.language,
+                            onSelect = viewModel::setLanguage
+                        )
+                    }
                 }
             }
 
-            item {
-                SettingsSection(title = stringResource(R.string.app_description_title)) {
-                    Text(
-                        text = stringResource(R.string.app_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
-                }
-            }
-
+            // --- Секция "О приложении" ---
             item {
                 SettingsSection(title = stringResource(R.string.about)) {
-                    ListItem(
-                        headlineContent = {
-                            Text(stringResource(R.string.version, uiState.versionName))
-                        },
-                        supportingContent = {
-                            Text(stringResource(R.string.author, "MaxGog"))
-                        }
-                    )
+                    SettingsGroup {
+                        AboutSettings(
+                            version = uiState.versionName,
+                            author = stringResource(R.string.author_name)
+                        )
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun AboutSettings(version: String, author: String) {
+    Column {
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.version_label, version)) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+        )
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.author_label)) },
+            supportingContent = { Text(author) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+        )
     }
 }

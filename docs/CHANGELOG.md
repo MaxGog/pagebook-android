@@ -52,10 +52,10 @@
   `LaunchedEffect(uiState.selectedDate)`.
 
 **Tags — сквозная система цветных тегов**
-- **Domain-модели**: `Tag` (`id`, `name`, `colorHex`) и `TagColor` (enum из 7
+- **Domain-модели**: `Tag` (`id`, `name`, `colorHex`, `emoji`) и `TagColor` (enum из 7
   цветов macOS: `RED`, `ORANGE`, `YELLOW`, `GREEN`, `BLUE`, `PURPLE`, `GRAY`).
 - **`TagRepository`** (интерфейс) + `TagRepositoryImpl` (реализация) + `TagMapper`.
-- **`TagModel`** (`@Entity tableName = "tags"`).
+- **`TagModel`** (`@Entity tableName = "tags"`, колонка `Emoji`).
 - **Junction-таблицы** для many-to-many:
   `NoteTagCrossRef`, `TaskTagCrossRef`, `EventTagCrossRef`
   (составной PK, `onDelete = CASCADE` на обе стороны).
@@ -65,21 +65,20 @@
 - **`NoteWithTags`, `TaskWithTags`, `EventWithTags`** — `@Relation` + `@Junction`
   для загрузки сущности вместе с тегами одним запросом (без N+1).
 - **Use Cases** в `domain/usecase/tag/`:
-  - `GetAllTagsUseCase`, `CreateTagUseCase`, `UpdateTagUseCase`, `DeleteTagUseCase`.
+  - `GetAllTagsUseCase`, `CreateTagUseCase` (`name, color, emoji`),
+    `UpdateTagUseCase` (`name, color, emoji`), `DeleteTagUseCase`.
   - `GetTagsForNoteUseCase`, `GetTagsForTaskUseCase`, `GetTagsForEventUseCase`.
   - `ToggleTagOnNoteUseCase`, `ToggleTagOnTaskUseCase`, `ToggleTagOnEventUseCase`
     (возвращают `Boolean` — был ли тег добавлен).
 - **UI-компоненты** в `ui/components/`:
-  - `TagChip` — `FilterChip` с цветным кружком и опциональной кнопкой ×.
-  - `CompactTagChip` — компактная плашка для карточек в списках.
-  - `CreateTagDialog` — диалог создания тега с палитрой из 7 цветов.
+  - `TagChip` — `FilterChip` с эмодзи (или цветным кружком) и опциональной кнопкой ×.
+  - `CompactTagChip` — компактная плашка `"🎯 Цели"`.
+  - `CreateTagDialog` — диалог с превью, полем имени, кнопкой «Добавить эмодзи», палитрой 7 цветов.
   - `TagPickerDialog` — выбор тегов для сущности с кнопкой «Создать тег».
-- **Интеграция в Notes**: кнопка 🏷️ в `NoteEditScreen`, чипы под заголовком,
-  `TagPickerDialog` + `CreateTagDialog`, до 3 `CompactTagChip` на `NoteItem`.
-- **Интеграция в Tasks**: аналогично `NoteEditScreen` — кнопка 🏷️, чипы,
-  диалоги; до 3 `CompactTagChip` на `TaskItem`.
-- **Интеграция в Calendar**: встроенный выбор тегов в `AddEventDialog`,
-  `pendingTags` во `CalendarViewModel`, до 3 `CompactTagChip` на `EventItem`.
+  - **`EmojiCatalog`** — 200+ эмодзи в 10 категориях (`@StringRes` для названий).
+  - **`EmojiPickerDialog`** — `FilterChip`-категории + `LazyVerticalGrid` эмодзи.
+- **Интеграция в Notes/Tasks/Calendar**: кнопка 🏷️, чипы под заголовком/описанием,
+  `TagPickerDialog` + `CreateTagDialog`, до 3 `CompactTagChip` на карточках.
 - **`_pendingTags` / `selectedTags`** — накопление тегов для новой
   (ещё не сохранённой) сущности; привязка после `save*`, когда Room
   сгенерировал `id`.
@@ -87,203 +86,171 @@
 **Единая база данных**
 - **`PageBookDatabase`** — единая `@Database` с 7 сущностями
   (`NoteModel`, `TaskModel`, `EventModel`, `TagModel`, `NoteTagCrossRef`,
-  `TaskTagCrossRef`, `EventTagCrossRef`), `version = 2`.
-- Заменяет три отдельные БД (`NoteRoomDatabase`, `TaskRoomDatabase`,
-  `EventRoomDatabase`) — необходимое условие для `ForeignKey` между
+  `TaskTagCrossRef`, `EventTagCrossRef`), `version = 3`.
+- Заменяет три отдельные БД — необходимое условие для `ForeignKey` между
   сущностями и тегами.
+- **`MIGRATION_2_3`** — `ALTER TABLE tags ADD COLUMN Emoji TEXT`.
 
-**Настройки (DataStore)**
-- **`SettingsRepository`** — `Flow<ThemeMode>`, `Flow<LanguageOption>`,
-  `setThemeMode()`, `setLanguage()`. Хранит значения в `DataStore<Preferences>`.
-- **`DataStoreModule`** (Hilt) — singleton `DataStore<Preferences>`
-  (`preferencesDataStore(name = "settings")`).
-- **`ThemeViewModel`** — подписка `MainActivity` на `themeMode` для
-  реактивного переключения темы без перезапуска.
-- **`SettingsViewModel`** — `setLanguage()` вызывает
-  `AppCompatDelegate.setApplicationLocales()` (Android 13+ через `LocaleManager`,
-  ниже — через AppCompat + `recreate()`).
-- **UI**: `SettingsScreen` переработан на `SettingsSection` + `ListItem` +
-  `ExposedDropdownMenuBox` (в стиле CharacterBook).
-  `ThemePreference`, `LanguagePreference`, `SettingsSection`.
+**Настройки (DataStore + AppCompatDelegate)**
+- **`SettingsRepository`** — `Flow<ThemeMode>`, `setThemeMode()`. Хранит тему в `DataStore<Preferences>`.
+- **`DataStoreModule`** (Hilt) — singleton `DataStore<Preferences>`.
+- **`ThemeViewModel`** — подписка `MainActivity` на `themeMode` для реактивного переключения темы.
+- **`AppLanguage`** (enum с `tag: String?` и `@StringRes labelRes`):
+  `current()` читает из `AppCompatDelegate`, `apply()` устанавливает локаль.
+- **`SettingsViewModel.setLanguage()`** — вызывает только `AppLanguage.apply()`.
+- **Material 3 Expressive UI**:
+  - Группы настроек в `Card` с `RoundedCornerShape(28.dp)`.
+  - `ListItem` с `Color.Transparent` внутри групп.
+  - `supportingContent` с пояснениями (`theme_system_desc`, `language_ru_desc` и т.д.).
+  - Заголовки разделов через `SettingsSection` (`titleSmall`, `primary`).
+- **`OverflowMenu`** (три точки) в `TopAppBar` всех главных экранов (Tasks, Notes, Calendar) с пунктом «Настройки».
 
 **Создание задач из заметок (UI)**
-- **Кнопка `AddTask` в `TopAppBar` `NoteEditScreen`** — только для
-  сохранённой заметки (`Editing`). Для `NewNote` скрыта, так как нет `noteId`.
-- **`NoteEditViewModel.createTaskFromCurrentNote()`** — берёт `title` +
-  `content` текущей заметки, вызывает `CreateTaskFromNoteUseCase`, привязывает
-  задачу к заметке (`noteId = current.note.id`) и сохраняет через `SaveTaskUseCase`.
-- **`taskCreating: StateFlow<Boolean>`** — пока идёт создание, кнопка
-  показывает `CircularProgressIndicator` и disabled (защита от двойного клика).
-- **`snackbarMessage: StateFlow<String?>`** + `SnackbarHost` в `Scaffold` —
-  обратная связь: «Задача создана» / «Задача создана с напоминанием» /
-  «Ошибка: …».
-- **`stripHtml` перенесён в `CreateTaskFromNoteUseCase`** — HTML из
-  `RichTextEditor` очищается от тегов и entities перед передачей в ML Kit,
-  иначе он не находит даты.
-- **`EntityExtractor` кеширован** через `by lazy` + `@Singleton` — не создаётся
-  новый клиент на каждый вызов.
+- **Кнопка `AddTask` в `TopAppBar` `NoteEditScreen`** — только для сохранённой заметки.
+- **`NoteEditViewModel.createTaskFromCurrentNote()`** — вызывает `CreateTaskFromNoteUseCase`, привязывает `noteId`, сохраняет через `SaveTaskUseCase`.
+- **`taskCreating: StateFlow<Boolean>`** — `CircularProgressIndicator` в кнопке + disabled.
+- **`snackbarMessageRes: StateFlow<Int?>`** — `@StringRes` для локализации Snackbar
+  (`task_created`, `task_created_with_reminder`, `task_creation_error`).
+- **`stripHtml` в `CreateTaskFromNoteUseCase`** — HTML очищается перед ML Kit.
+- **`EntityExtractor` кеширован** (`by lazy` + `@Singleton`).
 
-**Навигация и UI**
-- **Type-safe navigation**: `Destinations.kt` с `@Serializable` объектами
-  и классами данных.
-- **`hasRoute<T>()`** вместо сравнения строк в `BottomNavBar` и `CombinedApp`.
-- **Debug build type** с `applicationIdSuffix = ".debug"`
-  и `versionNameSuffix = "-debug"`.
-- **`_isSaved: StateFlow<Boolean>`** во ViewModels редактирования —
-  экран закрывается только после завершения сохранения (устранён race condition).
+**Навигация и адаптивный UI**
+- **Type-safe navigation** через `@Serializable` destinations.
+- **`hasRoute<T>()`** вместо сравнения строк.
+- **`NavigationSuiteScaffold`** (`material3-adaptive-navigation-suite`) —
+  автоматически переключает `NavigationBar` ↔ `NavigationRail` по `WindowSizeClass`.
+  Управление видимостью через `scaffoldState.hide()/show()`.
+- **`ListDetailPaneScaffold`** для `TaskListDestination` при `WindowWidthSizeClass.Expanded`:
+  `TaskListDetailPane` показывает список и редактор рядом (планшеты/Chromebook).
+- **`calculateWindowSizeClass(this)`** в `MainActivity` → `CombinedApp`.
+- **One-Shot Events** через `Channel<T>(Channel.BUFFERED)` + `receiveAsFlow()`
+  для `TaskEditEvent`, `NoteEditEvent` (`Saved`, `Deleted`). Заменяет
+  `StateFlow<Boolean> isSaved` — событие доставляется **ровно один раз**.
+- **`TaskListDetailPane`**: `rememberListDetailPaneScaffoldNavigator<TaskEditDestination>()`,
+  `navigator.navigateTo(Detail, TaskEditDestination(id))` (в `scope.launch`).
+- **`TaskEditViewModel.setTaskId(id)`** — для detail-pane, когда `SavedStateHandle` пуст.
+
+**Google Keep-style Note Editor**
+- **`BasicTextField` без рамки** для заголовка (`headlineSmall`, placeholder через `decorationBox`).
+- **Теги в `FlowRow`** — переносятся на новую строку, без `Card`.
+- **`RichTextEditor` на `weight(1f)`** — занимает всё оставшееся пространство.
+- **`FormattingToolbar`** использует `windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))` — тулбар **всегда над клавиатурой** (и над навбаром, когда клавиатура закрыта).
 
 **Зависимости**
-- `kotlinx-serialization-json` — для типобезопасной навигации.
-- `kizitonwose.calendar:compose` — для экрана календаря.
-- **`com.google.mlkit:entity-extraction`** (beta) — извлечение дат из текста.
-- `kotlinx-coroutines-play-services` — для `.await()` на ML Kit Task.
-- **Room Gradle plugin** — экспорт схемы в `app/schemas/`.
-- **`androidx.datastore:datastore-preferences`** — хранение настроек.
-- **`androidx.appcompat:appcompat`** — для смены локали на Android < 13.
+- `kotlinx-serialization-json`, `kizitonwose.calendar:compose`,
+  `com.google.mlkit:entity-extraction` (beta), `kotlinx-coroutines-play-services`,
+  Room Gradle plugin, `androidx.datastore:datastore-preferences`,
+  `androidx.appcompat:appcompat`, **`material3-adaptive-navigation-suite`**,
+  **`material3-adaptive` / `adaptive-layout` / `adaptive-navigation`**,
+  **`material3-window-size-class`**.
 
 **Документация**
-- Черновик документации: `ARCHITECTURE.md`, `CONTRIBUTING.md`, `CHANGELOG.md`.
+- `ARCHITECTURE.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `README.md` (актуализированы).
 
 ### Changed
 
 **Gradle-конфигурация**
 - AGP `9.4.1`, Kotlin `2.2.20`, KSP `2.2.20-2.0.4`, Compose BOM `2026.09.00`.
 - `compileSdk = 37`, `targetSdk = 36`, `minSdk = 28`, JDK 21.
-- Удалён устаревший `buildscript` — версии плагинов резолвятся через `pluginManagement`.
-- `kotlinOptions` → `kotlin { compilerOptions { ... } }` (встроено в AGP 9).
-- `buildConfig = true` — для `BuildConfig.VERSION_NAME` в настройках.
-- `android:localeConfig="@xml/locales_config"` в `AndroidManifest.xml`
-  (`ru`, `en`).
+- Удалён устаревший `buildscript`.
+- `kotlinOptions` → `kotlin { compilerOptions { ... } }`.
+- `buildConfig = true` — для `BuildConfig.VERSION_NAME`.
+- `android:localeConfig="@xml/locales_config"` в `AndroidManifest.xml` (`ru`, `en`).
 
 **Data Layer**
-- **Репозитории** разделены на интерфейс (`domain/repository/`) и реализацию
-  (`data/repository/`): `NoteRepositoryImpl`, `TaskRepositoryImpl`,
-  `EventRepositoryImpl`, `TagRepositoryImpl`.
-- **Hilt**: вместо отдельных `NotesModule`, `TaskModule`, `EventModule`,
-  `TagModule` — единый **`RepositoryModule`** с `@Binds` (4 привязки
-  `интерфейс → реализация`). `DatabaseModule` предоставляет `PageBookDatabase`
-  и 4 DAO.
-- **`NoteDao`**: добавлены `@Transaction getAllWithTags()` и `getWithTagsById()`
-  для загрузки заметок с тегами. `getAll()` сортирует по `AtCreated DESC`.
-- **`TaskDao`**: добавлены `@Transaction getAllWithTags()` и `getWithTagsById()`.
-  Сортировка `IsCompleted ASC, AtCreated DESC`, `getTasksByNoteId(noteId)`.
-- **`EventDao`**: возвращает `Flow` вместо `List`; добавлены `@Update`,
-  `@Transaction getAllWithTags()`, `getWithTagsById()`. `insert()` возвращает `Long`.
-- **`Note`, `Task`, `Event`** — добавлено поле `tags: List<Tag> = emptyList()`.
-- **Мапперы** `NoteMapper`, `TaskMapper`, `EventMapper` — перегружены:
-  `toDomain(tags: List<Tag>)` и `WithTags.toDomain()`.
+- **Репозитории** разделены на интерфейс (`domain/repository/`) и реализацию (`data/repository/`).
+- **Hilt**: единый **`RepositoryModule`** с `@Binds` (4 привязки).
+- **`NoteDao` / `TaskDao` / `EventDao`**: добавлены `@Transaction getAllWithTags()`,
+  `getWithTagsById()`; `insert()` возвращает `Long`; сортировки (`AtCreated DESC`,
+  `IsCompleted ASC, AtCreated DESC`, `date ASC, time ASC`).
+- **Доменные модели** `Note`, `Task`, `Event` получили `tags: List<Tag> = emptyList()`.
+- **Мапперы** перегружены: `toDomain(tags: List<Tag>)`, `WithTags.toDomain()`.
+- **`SettingsRepository`**: убран `LANGUAGE_KEY`, `language: Flow<...>`,
+  `setLanguage()` — язык теперь хранится **только** в `AppCompatDelegate`.
 
 **UI**
-- **Экран заметок** использует `contentPadding` вместо `Modifier.padding` —
-  контент корректно прокручивается под системными барами (edge-to-edge).
-- **`collectAsStateWithLifecycle()`** вместо `collectAsState()` в подписках.
-- **`FormattingToolbar`** получил `navigationBarsPadding()` и фон
-  `surfaceContainerLow` — больше не уходит под системную навигацию.
-- **`NoteItem`, `TaskItem`, `EventItem`** принимают доменные модели
-  (`Note`, `Task`, `Event`) и отображают до 3 `CompactTagChip` + `+N`.
-- **`NoteEditUiState`, `TaskEditUiState`** — `NewNote(selectedTags)` /
-  `NewTask(selectedTags)` и `Editing(note/task, tags)`.
-- **`CalendarViewModel`** — `allTags`, `pendingTags`, `toggleTag`,
-  `createAndToggleTag`, привязка тегов в `addEvent`.
-- **`LocalConfiguration.current.locales[0]`** вместо устаревшего
-  `LocalLocale.current.platformLocale` в `CalendarScreen`.
+- **Экраны** используют `contentPadding` вместо `Modifier.padding` (edge-to-edge).
+- **`collectAsStateWithLifecycle()`** вместо `collectAsState()`.
+- **`NoteItem` / `TaskItem` / `EventItem`**: `shapes.large`, `FlowRow` для тегов (все, а не `take(3)`).
+- **`NoteItem`**: `Text(AnnotatedString.fromHtml(note.content))` — HTML теги
+  (`<p>`, `<br>`, `&nbsp;`) больше не видны в карточке.
+- **`TaskEditScreen` / `NoteEditScreen`**: `ContentDescription` через `stringResource`.
+- **`CalendarScreen`**: добавлен `CenterAlignedTopAppBar` с `OverflowMenu`.
+- **`NotesScreen`**: `IconButton(Settings)` → `OverflowMenu`.
+- **`TaskListScreen`**: + `onSettingsClick`, `OverflowMenu` в `TopAppBar`.
+- **`SettingsScreen`**: `SettingsGroup` (Card 28dp) + `ListItem` с прозрачным фоном;
+  секции с `SettingsSection`; `AboutSettings` в `Card`.
+- **`AppLanguage`**: `SYSTEM(null)`, `RUSSIAN("ru")`, `ENGLISH("en")`, `@StringRes` названия.
 
 **Документация**
-- `README.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md` приведены в соответствие
-  с фактической структурой: Clean Architecture для всех модулей,
-  `ui/tasks/`, `ui/calendar/`, `ui/components/`, `usecase/{note,task,event,tag}/`,
-  единая `PageBookDatabase`, сквозные теги, DataStore для настроек.
+- `ARCHITECTURE.md`: добавлены разделы «Адаптивный UI», «One-Shot Events»,
+  «Настройки (DataStore + AppCompatDelegate)», обновлены диаграммы, roadmap.
+- `README.md`: обновлены стек (Adaptive, M3 Expressive), roadmap.
+- `CHANGELOG.md`: актуализирован.
 
 ### Removed
-- Зависимость `accompanist-systemuicontroller` (deprecated, заменена
-  `enableEdgeToEdge()`).
+- `accompanist-systemuicontroller` (deprecated → `enableEdgeToEdge()`).
 - Плагин `kotlin-android` (встроен в AGP 9).
-- Файлы `Screen.kt`, `Routes.kt`, `NotesDestinations.kt` — заменены на
-  `Destinations.kt`.
-- Старые классы `data/repositories/{NoteRepository,TodoRepository,EventRepository}.kt` —
-  заменены интерфейсами в `domain/` + реализациями в `data/repository/`.
-- Устаревшие ViewModels `viewmodels/{NoteViewModel,NoteEditViewModel,
-  TodoViewModel,CalendarViewModel}.kt` — переехали в `ui/{notes,note_edit,tasks,calendar}/`.
-- Все файлы `Todo*` (модель, DAO, база, репозиторий, модуль, экран, item).
-- Устаревший `ui/screens/TodoScreen.kt`, `ui/screens/CalendarScreen.kt`.
-- **Три отдельные БД**: `NoteRoomDatabase.kt`, `TaskRoomDatabase.kt`,
-  `EventRoomDatabase.kt` — заменены единым `PageBookDatabase.kt`.
-- **Отдельные Hilt-модули репозиториев**: `NotesModule.kt`, `TaskModule.kt`,
-  `EventModule.kt`, `TagModule.kt` — заменены единым `RepositoryModule.kt`
-  с `@Binds`.
-- **`ui/dialogs/`** (старая папка) — `AddEventDialog`, `DateTimePickerDialog`,
-  `AddTodoDialog` переехали в `ui/calendar/`.
+- `Screen.kt`, `Routes.kt`, `NotesDestinations.kt` → `Destinations.kt`.
+- Старые `data/repositories/{NoteRepository,TodoRepository,EventRepository}.kt`.
+- Устаревшие `viewmodels/{Note,NoteEdit,Todo,Calendar}ViewModel.kt`.
+- Все файлы `Todo*`.
+- `ui/screens/{TodoScreen,CalendarScreen}.kt`.
+- Три отдельные БД (`NoteRoomDatabase`, `TaskRoomDatabase`, `EventRoomDatabase`).
+- Отдельные Hilt-модули репозиториев (`NotesModule`, `TaskModule`, `EventModule`, `TagModule`).
+- `ui/dialogs/` — переехали в `ui/calendar/`.
+- **`SettingsRepository.setLanguage()`** и `LANGUAGE_KEY` — язык хранится только в `AppCompatDelegate`.
+- **`segmentedListItemColors()`** и `itemShape` — заменены на `Card(28.dp)` + `ListItem(Color.Transparent)`.
 
 ### Fixed
-- **Нижняя панель навигации** больше не исчезает после перехода на type-safe
-  навигацию (`destination.hasRoute<T>()` вместо сравнения строк).
-- **Краш `Cannot find startDestination`** — `TaskListDestination` зарегистрирован
-  в `AppNavHost` и совпадает с `startDestination`.
-- **Краш `Destination TaskEditDestination cannot be found`** — добавлен
-  `composable<TaskEditDestination>` в граф.
-- **Контент экранов** больше не перекрывается системными барами и нижней
-  навигацией (`Modifier.padding(innerPadding)` передаётся в `AppNavHost`).
-- **Конфликт версий KSP/Kotlin** — версии синхронизированы.
-- **Reserved alias** `androidx-material3-window-size-class` →
-  `androidx-material3-window-size`.
-- **Ошибка `Unresolved reference 'kizitonwose'`** — зависимость возвращена
-  в `libs.versions.toml`.
+- **Нижняя панель навигации** больше не исчезает (`destination.hasRoute<T>()`).
+- **Краш `Cannot find startDestination`** — `composable<TaskListDestination>` зарегистрирован.
+- **Краш `Destination TaskEditDestination cannot be found`** — добавлен в граф.
+- **Краш `Room cannot verify the data integrity`** — версия БД увеличена, `MIGRATION_2_3`.
+- **Краш `[Dagger/DuplicateBindings] TagRepository`** — удалены старые модули.
+- **Краш `[Dagger/MissingBinding] EventRepository`** — `RepositoryModule` с `@Binds`.
+- **Контент экранов** больше не перекрывается системными барами (`Modifier.padding(innerPadding)`).
+- **Конфликт KSP/Kotlin** — версии синхронизированы.
+- **Reserved alias** `androidx-material3-window-size-class` → `androidx-material3-window-size`.
+- **`Unresolved reference 'kizitonwose'`** — зависимость восстановлена.
 - **`setEntityTypesFilter` ML Kit** ожидает `Set<Int>`, а не `List<Int>`.
-- **`TaskModel` `ForeignKey` на `NoteModel`** не работает между разными БД —
-  заменён на `Index("NoteId")` с ручной отвязкой в `DeleteNoteUseCase`.
-- **`EventTagCrossRef`, `TaskTagCrossRef`** — исправлены `ForeignKey`
-  (правильные entity: `EventModel`/`TaskModel`, поля `eventId`/`taskId`
-  вместо `noteId`), `childColumns = ["tagId"]` для FK на `TagModel`.
-- **`EventWithTags`, `TaskWithTags`** — `parentColumn = "id"` (а не
-  `"EventId"`/`"TaskId"`), `@Embedded val event/task`.
-- **`TagDao.getTagsForTask`/`getTagsForEvent`** — `SELECT t.* FROM tags t`
-  вместо `FROM tasks t`/`FROM events t`.
-- **`DatabaseModule`** — импорты `dagger.Provides` (не
-  `com.google.android.datatransport...`), `javax.inject.Singleton`
-  (не Jakarta), добавлены `@Module` + `@InstallIn(SingletonComponent::class)`.
-- **`[Dagger/DuplicateBindings] TagRepository`** — удалены старые
-  `TagModule`/`EventModule`/`NotesModule`/`TaskModule` (дублировали `@Binds`
-  из `RepositoryModule`).
-- **`SaveNoteUseCase`, `SaveTaskUseCase`, `SaveEventUseCase`** — возвращают
-  `Long` (id сохранённой сущности) вместо `Unit`; иначе `savedId.toInt()`
-  в ViewModel не компилируется.
-- **`NoteEditViewModel.init`** — убран «висячий» `collect`, который никогда
-  не завершался (экран навсегда оставался в `Loading`).
-- **`NoteEditScreen`, `TaskEditScreen`** — `onBack()` больше не вызывается
-  сразу после `viewModel.save()`; переход через `LaunchedEffect(isSaved)`
-  (устранён race condition при сохранении тегов).
-- **`SettingsRepository`** — импортирует `LanguageOption` из `ui/settings`,
-  но фактически используется только в `SettingsViewModel`; нарушение
-  Clean Architecture (data → ui) отмечено, будет исправлено переносом
-  в `domain/model/`.
-- **`CreateTaskFromNoteUseCase`: ML Kit API** — `EntityExtraction.EntityType.TYPE_DATE_TIME`
-    → `Entity.TYPE_DATE_TIME`, `entity.timestampMillis` →
-    `entity.asDateTimeEntity()?.timestampMillis`. Класса `EntityType` в Android SDK
-    нет (это iOS-API), а `timestampMillis` есть только у `DateTimeEntity`.
-- **Выбор ближайшей будущей даты** — вместо `firstOrNull { ... }` используется
-  `mapNotNull { asDateTimeEntity()?.timestampMillis }.filter { > now }.minOrNull()`.
-  В тексте «Сегодня в 10:00 и завтра в 18:00» ML Kit возвращает две сущности,
-  раньше бралась первая (уже прошедшая), теперь — ближайшая будущая.
-- **`try/catch` вокруг `annotate()`** — при отсутствии сети / нескачанной модели
-  задача создаётся **без напоминания**, приложение не крашится.
+- **`TaskModel.ForeignKey(NoteModel)`** между разными БД → `Index("NoteId")` + ручная отвязка в `DeleteNoteUseCase`.
+- **`EventTagCrossRef` / `TaskTagCrossRef`**: правильные entity (`EventModel`/`TaskModel`), `childColumns = ["tagId"]`.
+- **`EventWithTags` / `TaskWithTags`**: `parentColumn = "id"`, `@Embedded val event/task`.
+- **`TagDao.getTagsForTask/getTagsForEvent`**: `SELECT t.* FROM tags t` (а не `FROM tasks`/`events`).
+- **`DatabaseModule`**: правильные импорты (`dagger.Provides`, `javax.inject.Singleton`), `@Module` + `@InstallIn`.
+- **`Save*UseCase`** возвращают `Long` (id сохранённой сущности).
+- **`NoteEditViewModel.init`** — убран «висячий» `collect`, экран не застревал в `Loading`.
+- **`NoteEditScreen` / `TaskEditScreen`** — `onBack()` через `LaunchedEffect(Unit) { events.collect { ... } }` (нет race condition).
+- **`CreateTaskFromNoteUseCase`**: `Entity.TYPE_DATE_TIME` (не `EntityExtraction.EntityType`), `asDateTimeEntity()?.timestampMillis` (только у `DateTimeEntity`).
+- **Выбор ближайшей будущей даты** — `mapNotNull { asDateTimeEntity()?.timestampMillis }.filter { > now }.minOrNull()`.
+- **`try/catch` вокруг `annotate()`** — при отсутствии модели/сети задача создаётся без напоминания, без краша.
+- **`AddEventDialog`: `Unresolved reference 'viewModel'`** — заменено на `onCreateTag(...)` (диалог — чистый Composable без VM).
+- **`SettingsViewModel.setLanguage` — Unresolved reference** — метод восстановлен, вызывает только `AppLanguage.apply()`.
+- **Дизайн настроек сломался** (`SegmentedListItem` нет в стабильной `material3`) — заменён на `Card(28.dp)` + `ListItem(Color.Transparent)`.
+- **`SettingsGroup` без заголовков** — добавлены `SettingsSection` + `supportingContent` с описаниями.
+- **`HTML` в карточках заметок** — `Text(note.content)` → `Text(AnnotatedString.fromHtml(note.content))`.
+- **`FormattingToolbar` уходил под клавиатуру** — `windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))`.
+- **Смена языка не работала** — требуется `MainActivity : AppCompatActivity` + `Theme.AppCompat.*` (в процессе).
+- **`BuildConfig` не компилировался** — `buildConfig = true` в `build.gradle.kts`.
+- **`SegmentListItem` не компилировался** — заменён на стабильные `ListItem` + `Card`.
 
 ### Planned
-- **Фильтрация списков по тегам** в Notes / Tasks / Calendar
-  (горизонтальный `LazyRow` с `FilterChip` над списком).
-- **Редактирование существующих тегов** (имя/цвет) — `UpdateTagUseCase` готов,
-  нужен UI в `CreateTagDialog` или отдельный `EditTagDialog`.
-- **Счётчик использования тега** — сколько заметок/задач/событий
-  используют (полезно перед удалением).
+- **Смена языка на Android < 13** — миграция `MainActivity` на `AppCompatActivity` и темы на `Theme.AppCompat.*`.
+- **Фильтрация списков по тегам** (Notes / Tasks / Calendar).
+- **Редактирование существующих тегов** (имя/цвет/эмодзи).
+- **Счётчик использования тега**.
+- **Поиск по эмодзи** в `EmojiPickerDialog`.
+- **Недавние эмодзи** (последние 20 в `DataStore`).
+- **`ListDetailPaneScaffold` для Notes и Calendar** (аналогично Tasks).
 - Синхронизация с облаком.
-- Ручное переключение тёмной темы в настройках (сейчас — через `DataStore`).
 - Виджеты для главного экрана.
 - Резервное копирование.
 - Голосовые заметки.
 - Модуляризация (feature-модули).
-- Unit-тесты для Use Cases и Repository (включая `ToggleTagOn*UseCase`).
+- Unit-тесты для Use Cases и Repository.
 - WorkManager для напоминаний о задачах.
-- Настройка `room.schemaLocation` (Room Gradle plugin уже подключён,
-  нужен `schemaDirectory("$projectDir/schemas")`).
+- Настройка `room.schemaLocation` (Room Gradle plugin уже подключён).
 
 ## [0.1.0] — 04-02-2025
 

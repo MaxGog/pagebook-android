@@ -8,7 +8,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import ru.maxgog.pagebook.R
 import ru.maxgog.pagebook.domain.model.Tag
 
 @Composable
@@ -21,15 +23,15 @@ fun TagPickerDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Теги") },
+        title = { Text(stringResource(R.string.tags)) },
         text = {
             if (allTags.isEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Пока нет тегов")
+                    Text(stringResource(R.string.no_tags_yet))
                     TextButton(onClick = onCreateTag) {
                         Icon(Icons.Default.Add, contentDescription = null)
                         Spacer(Modifier.width(4.dp))
-                        Text("Создать тег")
+                        Text(stringResource(R.string.create_tag))
                     }
                 }
             } else {
@@ -50,12 +52,14 @@ fun TagPickerDialog(
                         TextButton(onClick = onCreateTag) {
                             Icon(Icons.Default.Add, contentDescription = null)
                             Spacer(Modifier.width(4.dp))
-                            Text("Создать тег")
+                            Text(stringResource(R.string.create_tag))
                         }
                     }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Готово") } }
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.done)) }
+        }
     )
 }

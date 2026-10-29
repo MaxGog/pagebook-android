@@ -9,3 +9,8 @@ sealed interface TaskEditUiState {
     data class Editing(val task: Task, val tags: List<Tag> = emptyList()) : TaskEditUiState
     data class Error(val message: String) : TaskEditUiState
 }
+
+sealed interface TaskEditEvent {
+    data object Saved : TaskEditEvent
+    data object Deleted : TaskEditEvent
+}

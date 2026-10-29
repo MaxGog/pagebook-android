@@ -63,13 +63,16 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     androidResources {
         generateLocaleConfig = true
     }
+
     kotlinOptions {
         jvmTarget = "21"
+        freeCompilerArgs = listOf("-XXLanguage:+PropertyParamAnnotationDefaultTargetMode")
     }
 }
 
@@ -108,6 +111,7 @@ dependencies {
     // --- Room ---
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
+    implementation(libs.protolite.well.known.types)
     ksp(libs.androidx.room.compiler)
 
     // --- Hilt ---
@@ -127,7 +131,12 @@ dependencies {
     implementation(libs.richeditor.compose)
     implementation(libs.kizitonwose.calendar.compose)
     implementation(libs.mlkit.entity.extraction)
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
+    implementation(libs.kotlinx.coroutines.play.services)
+    implementation(libs.androidx.compose.material3.adaptive.navigation.suite)
+    implementation(libs.androidx.compose.adaptive)
+    implementation(libs.androidx.compose.adaptive.layout)
+    implementation(libs.androidx.compose.adaptive.navigation)
+    implementation(libs.androidx.compose.material3.window.size.class1)
 
     // --- Testing ---
     testImplementation(libs.junit)

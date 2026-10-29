@@ -1,17 +1,14 @@
 package ru.maxgog.pagebook.ui.settings
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.RadioButtonDefaults
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.unit.dp
 import ru.maxgog.pagebook.R
 import ru.maxgog.pagebook.ui.theme.AppTheme
 
@@ -23,16 +20,18 @@ fun ThemePreference(
 ) {
     Column(modifier = modifier.selectableGroup()) {
         AppTheme.ThemeMode.entries.forEach { mode ->
-            androidx.compose.material3.ListItem(
+            val (titleRes, descRes) = when (mode) {
+                AppTheme.ThemeMode.SYSTEM -> R.string.theme_system to R.string.theme_system_desc
+                AppTheme.ThemeMode.LIGHT -> R.string.theme_light to R.string.theme_light_desc
+                AppTheme.ThemeMode.DARK -> R.string.theme_dark to R.string.theme_dark_desc
+            }
+
+            ListItem(
                 headlineContent = {
-                    Text(
-                        text = when (mode) {
-                            AppTheme.ThemeMode.SYSTEM -> androidx.compose.ui.res.stringResource(R.string.theme_system)
-                            AppTheme.ThemeMode.LIGHT -> androidx.compose.ui.res.stringResource(R.string.theme_light)
-                            AppTheme.ThemeMode.DARK -> androidx.compose.ui.res.stringResource(R.string.theme_dark)
-                        },
-                        style = MaterialTheme.typography.bodyLarge
-                    )
+                    Text(stringResource(titleRes))
+                },
+                supportingContent = {
+                    Text(stringResource(descRes))
                 },
                 leadingContent = {
                     RadioButton(
@@ -44,13 +43,12 @@ fun ThemePreference(
                         )
                     )
                 },
-                modifier = Modifier
-                    .selectable(
-                        selected = mode == selected,
-                        onClick = { onSelect(mode) },
-                        role = Role.RadioButton
-                    )
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                modifier = Modifier.selectable(
+                    selected = mode == selected,
+                    onClick = { onSelect(mode) },
+                    role = Role.RadioButton
+                )
             )
         }
     }

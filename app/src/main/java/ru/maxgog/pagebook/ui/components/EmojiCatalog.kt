@@ -1,56 +1,62 @@
 package ru.maxgog.pagebook.ui.components
 
+import androidx.annotation.StringRes
+import ru.maxgog.pagebook.R
+
 object EmojiCatalog {
-    data class Category(val name: String, val emojis: List<String>)
+    data class Category(
+        @StringRes val nameRes: Int,
+        val emojis: List<String>
+    )
 
     val categories: List<Category> = listOf(
-        Category("Смайлы", listOf(
+        Category(R.string.emoji_cat_smiles, listOf(
             "😀","😃","😄","😁","😊","😎","🤔","😅","😂","🙂",
             "😉","🥰","😍","🤩","😇","🥳","😴","🤯","🥺","😢",
             "😭","😤","😡","🤬","🤗","🤭","🤫","😶","🙄","😬",
             "😷","🤒","🤕","🤢","🤮","🤧","😵","😱","😨","😰"
         )),
-        Category("Работа", listOf(
+        Category(R.string.emoji_cat_work, listOf(
             "💼","🖥️","📊","📈","📉","📋","📝","✏️","📌","📎",
             "🖇️","📁","📂","🗂️","🗃️","🗄️","📅","📆","🗓️","⏰",
             "⌛","⏳","📞","📧","📨","📩","📤","📥","💾","💿"
         )),
-        Category("Идеи", listOf(
+        Category(R.string.emoji_cat_ideas, listOf(
             "💡","🎯","🔥","⭐","✨","🌟","💫","🚀","🎨","🎭",
             "🧠","🔮","🎁","🏆","🥇","🥈","🥉","🎉","🎊","💎",
             "🔑","🗝️","🔒","🔓","🔔","🔕","📢","📣","💬","💭"
         )),
-        Category("Учёба", listOf(
+        Category(R.string.emoji_cat_study, listOf(
             "📚","📖","📕","📗","📘","📙","📓","📔","📒","🔖",
             "🎓","✏️","🖊️","🖋️","🖌️","🖍️","📐","📏","🔬","🔭",
             "🧪","🧬","🧮","🗺️","🌍","🌎","🌏","🧭","🔍","🔎"
         )),
-        Category("Дом", listOf(
+        Category(R.string.emoji_cat_home, listOf(
             "🏠","🏡","🏘️","🏢","🏬","🏭","🛋️","🛏️","🚪","🪟",
             "🪑","🛁","🚿","🚽","🧴","🧻","🧹","🧺","🧼","🧽",
             "🪣","🔧","🔨","🪛","🪚","⚙️","🔩","🪤","🧯","🔌"
         )),
-        Category("Еда", listOf(
+        Category(R.string.emoji_cat_food, listOf(
             "☕","🍵","🥤","🧃","🥛","🍕","🍔","🍟","🌮","🌯",
             "🍣","🍱","🍜","🍝","🍲","🥗","🍎","🍌","🍇","🍓",
             "🍒","🍰","🎂","🧁","🍪","🍩","🍫","🍬","🍭","🍯"
         )),
-        Category("Природа", listOf(
+        Category(R.string.emoji_cat_nature, listOf(
             "🌿","🌸","🌺","🌻","🌹","🌷","🌼","🍀","🌱","🌳",
             "🌲","🌴","🌵","🌾","🌊","🏔️","⛰️","🌋","🏝️","🏖️",
             "☀️","🌙","⭐","☁️","🌧️","⛈️","❄️","☃️","🌈","🔥"
         )),
-        Category("Спорт", listOf(
+        Category(R.string.emoji_cat_sport, listOf(
             "⚽","🏀","🏈","⚾","🎾","🏐","🏉","🎱","🏓","🏸",
             "🥊","🥋","🎽","🛹","🛼","🛷","⛸️","🏂","🏄","🏊",
             "🚴","🚵","🏋️","🤸","⛹️","🤺","🏇","🤼","🤽","🏌️"
         )),
-        Category("Путешествия", listOf(
+        Category(R.string.emoji_cat_travel, listOf(
             "✈️","🚀","🚁","🚂","🚆","🚇","🚌","🚎","🚐","🚑",
             "🚒","🚓","🚕","🚗","🚙","🚚","🚛","🛴","🚲","🛵",
             "🏍️","🛺","🚢","⛵","🛥️","🚤","⛴️","🛳️","🗽","🗼"
         )),
-        Category("Символы", listOf(
+        Category(R.string.emoji_cat_symbols, listOf(
             "❤️","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💔",
             "❣️","💕","💞","💓","💗","💖","💘","💝","✅","❌",
             "⚠️","🚫","♻️","⚡","💤","💢","💥","💦","💨","🕳️"

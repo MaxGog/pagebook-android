@@ -28,6 +28,7 @@ import ru.maxgog.pagebook.R
 import ru.maxgog.pagebook.domain.model.Event
 import ru.maxgog.pagebook.toKotlinxLocalDate
 import ru.maxgog.pagebook.ui.EmptyState
+import ru.maxgog.pagebook.ui.components.OverflowMenu
 import ru.maxgog.pagebook.ui.theme.AppTheme
 import java.time.YearMonth
 import java.time.format.TextStyle
@@ -35,6 +36,7 @@ import java.time.format.TextStyle
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarScreen(
+    onSettingsClick: () -> Unit,
     viewModel: CalendarViewModel = hiltViewModel(),
     modifier: Modifier = Modifier
 ) {
@@ -51,7 +53,6 @@ fun CalendarScreen(
         firstVisibleMonth = currentMonth
     )
 
-    // При смене выбранной даты — скроллим календарь к её месяцу
     LaunchedEffect(uiState.selectedDate) {
         calendarState.animateScrollToMonth(
             YearMonth.of(uiState.selectedDate.year, uiState.selectedDate.monthNumber)
@@ -60,6 +61,14 @@ fun CalendarScreen(
 
     Scaffold(
         modifier = modifier,
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = { Text(stringResource(R.string.calendar)) },
+                actions = {
+                    OverflowMenu(onSettingsClick = onSettingsClick)
+                }
+            )
+        },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { viewModel.showAddDialog() },
