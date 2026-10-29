@@ -24,7 +24,7 @@ fun CompactTagChip(
         modifier = modifier
     ) {
         Text(
-            text = tag.name,
+            text = if (tag.emoji != null) "${tag.emoji} ${tag.name}" else tag.name,
             style = MaterialTheme.typography.labelSmall,
             color = color,
             maxLines = 1,

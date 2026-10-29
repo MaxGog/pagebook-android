@@ -203,8 +203,8 @@ fun NoteEditScreen(
     if (showCreateTag) {
         CreateTagDialog(
             onDismiss = { showCreateTag = false },
-            onConfirm = { name, color ->
-                viewModel.createAndToggleTag(name, color)
+            onConfirm = { name, color, emoji ->
+                viewModel.createAndToggleTag(name, color, emoji)
                 showCreateTag = false
             }
         )

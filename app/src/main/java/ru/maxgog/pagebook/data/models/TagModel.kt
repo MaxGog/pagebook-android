@@ -8,5 +8,6 @@ import androidx.room.PrimaryKey
 data class TagModel(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     @ColumnInfo(name = "Name") val name: String,
-    @ColumnInfo(name = "ColorHex") val colorHex: String // "#FF3B30" — ARGB в hex
+    @ColumnInfo(name = "ColorHex") val colorHex: String, // "#FF3B30" — ARGB в hex
+    @ColumnInfo(name = "Emoji") val emoji: String? = null
 )

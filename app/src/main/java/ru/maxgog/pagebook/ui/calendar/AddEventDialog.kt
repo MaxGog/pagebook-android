@@ -15,6 +15,7 @@ import androidx.compose.ui.window.DialogProperties
 import kotlinx.datetime.LocalDate
 import ru.maxgog.pagebook.R
 import ru.maxgog.pagebook.domain.model.Tag
+import ru.maxgog.pagebook.domain.model.TagColor
 import ru.maxgog.pagebook.ui.components.CreateTagDialog
 import ru.maxgog.pagebook.ui.components.TagChip
 import ru.maxgog.pagebook.ui.components.TagPickerDialog
@@ -26,7 +27,7 @@ fun AddEventDialog(
     allTags: List<Tag>,
     selectedTags: List<Tag>,
     onToggleTag: (Tag) -> Unit,
-    onCreateTag: (String, ru.maxgog.pagebook.domain.model.TagColor) -> Unit,
+    onCreateTag: (name: String, color: TagColor, emoji: String?) -> Unit,   // ← было без emoji
     onDismiss: () -> Unit,
     onConfirm: (title: String, description: String, date: LocalDate, time: String) -> Unit,
     modifier: Modifier = Modifier
@@ -93,7 +94,7 @@ fun AddEventDialog(
                     placeholder = { Text("HH:MM") }
                 )
 
-                // 🆕 Теги
+                // Теги
                 Spacer(modifier = Modifier.height(16.dp))
                 if (selectedTags.isNotEmpty()) {
                     Row(
@@ -158,8 +159,8 @@ fun AddEventDialog(
     if (showCreateTag) {
         CreateTagDialog(
             onDismiss = { showCreateTag = false },
-            onConfirm = { name, color ->
-                onCreateTag(name, color)
+            onConfirm = { name, color, emoji ->
+                onCreateTag(name, color, emoji)   // ← было viewModel.createAndToggleTag
                 showCreateTag = false
             }
         )

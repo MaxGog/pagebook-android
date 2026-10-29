@@ -5,19 +5,17 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import ru.maxgog.pagebook.domain.model.Tag
+import androidx.compose.ui.unit.sp
 import androidx.core.graphics.toColorInt
+import ru.maxgog.pagebook.domain.model.Tag
 
 @Composable
 fun TagChip(
@@ -36,12 +34,16 @@ fun TagChip(
         onClick = { onClick?.invoke() },
         label = { Text(tag.name, color = contentColor) },
         leadingIcon = {
-            Box(
-                Modifier
-                    .size(8.dp)
-                    .clip(CircleShape)
-                    .background(color)
-            )
+            if (tag.emoji != null) {
+                Text(text = tag.emoji, fontSize = 16.sp)
+            } else {
+                Box(
+                    Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(color)
+                )
+            }
         },
         trailingIcon = if (onDelete != null) {
             {

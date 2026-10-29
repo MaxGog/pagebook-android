@@ -18,8 +18,8 @@ PageBook Android следует официальным рекомендация�
 > **Статус миграции:** Clean Architecture полностью внедрена для всех трёх
 > модулей — **Notes**, **Tasks** и **Events (Calendar)**. Todos переименованы
 > в Tasks и получили связь с заметками через `noteId`. Все три БД объединены
-> в одну `PageBookDatabase`. Добавлена сквозная система **цветных тегов**,
-> общая для заметок, задач и событий.
+> в одну `PageBookDatabase` (version 3). Добавлена сквозная система
+> **тегов с кастомизацией цвета и эмодзи**, общая для заметок, задач и событий.
 
 ## 🛠 Технологический стек
 
@@ -49,11 +49,12 @@ ru.maxgog.pagebook
 ├── data/
 │   ├── dao/                      # NoteDao, TaskDao, EventDao, TagDao
 │   ├── models/                   # Entity-классы + @Relation-обёртки
-│   │   ├── NoteModel, TaskModel, EventModel, TagModel
+│   │   ├── NoteModel, TaskModel, EventModel, TagModel (+ Emoji)
 │   │   ├── NoteTagCrossRef, TaskTagCrossRef, EventTagCrossRef
 │   │   └── NoteWithTags, TaskWithTags, EventWithTags
 │   ├── rooms/
-│   │   └── PageBookDatabase.kt   # Единая БД: 7 entities, version = 2
+│   │   ├── PageBookDatabase.kt   # Единая БД: 7 entities, version = 3
+│   │   └── Migrations.kt         # MIGRATION_2_3 (ALTER TABLE tags ADD Emoji)
 │   ├── mapper/                   # NoteMapper, TaskMapper, EventMapper, TagMapper
 │   ├── repository/               # NoteRepositoryImpl, TaskRepositoryImpl,
 │   │                             #   EventRepositoryImpl, TagRepositoryImpl,
@@ -64,7 +65,7 @@ ru.maxgog.pagebook
 │       └── DataStoreModule.kt    # DataStore<Preferences>
 │
 ├── domain/
-│   ├── model/                    # Note, Task, Event, Tag, TagColor
+│   ├── model/                    # Note, Task, Event, Tag (+ emoji), TagColor
 │   ├── repository/               # NoteRepository, TaskRepository,
 │   │                             #   EventRepository, TagRepository (интерфейсы)
 │   └── usecase/
@@ -72,7 +73,8 @@ ru.maxgog.pagebook
 │       ├── task/                 # GetAllTasks, GetTaskById, SaveTask,
 │       │                         #   DeleteTask, CreateTaskFromNote
 │       ├── event/                # GetAllEvents, SaveEvent, DeleteEvent
-│       └── tag/                  # GetAllTags, CreateTag, UpdateTag, DeleteTag,
+│       └── tag/                  # GetAllTags, CreateTag (name, color, emoji),
+│                                 #   UpdateTag (name, color, emoji), DeleteTag,
 │                                 #   GetTagsFor{Note,Task,Event},
 │                                 #   ToggleTagOn{Note,Task,Event}
 │
@@ -80,7 +82,8 @@ ru.maxgog.pagebook
 ├── app/                      # CombinedApp — корневой Scaffold
 ├── navigation/               # Destinations.kt, AppNavHost.kt, BottomNavBar.kt
 ├── components/               # TagChip, CompactTagChip,
-│                             #   CreateTagDialog, TagPickerDialog
+│                             #   CreateTagDialog, TagPickerDialog,
+│                             #   EmojiCatalog, EmojiPickerDialog
 ├── notes/                    # NotesScreen + ViewModel + UiState + NoteItem
 ├── note_edit/                # NoteEditScreen + ViewModel + UiState
 ├── tasks/                    # TaskListScreen, TaskEditScreen, TaskItem,
@@ -110,7 +113,7 @@ ru.maxgog.pagebook
         TaskTagCrossRef::class,
         EventTagCrossRef::class
     ],
-    version = 2,
+    version = 3,                // ← было 2 (добавлена колонка Emoji)
     exportSchema = true
 )
 abstract class PageBookDatabase : RoomDatabase() {
@@ -120,6 +123,21 @@ abstract class PageBookDatabase : RoomDatabase() {
     abstract fun tagDao(): TagDao
 }
 ```
+
+### Миграция `MIGRATION_2_3`
+
+```kotlin
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE tags ADD COLUMN Emoji TEXT")
+    }
+}
+```
+
+На этапе разработки `DatabaseModule` использует
+`fallbackToDestructiveMigration(dropAllTables = true)` — старая БД
+пересоздаётся (пользовательские теги теряются). Для продакшена нужно
+заменить на `.addMigrations(MIGRATION_2_3)`.
 
 ### Связи между сущностями
 
@@ -139,43 +157,91 @@ abstract class PageBookDatabase : RoomDatabase() {
 ## 🏷️ Система тегов
 
 Теги — **сквозная фича**: один и тот же тег может быть привязан к заметке,
-задаче и событию одновременно. Это реализовано как **many-to-many** через
-три junction-таблицы.
+задаче и событию одновременно. Каждый тег кастомизируется **цветом** и
+**эмодзи**. Реализовано как **many-to-many** через три junction-таблицы.
 
 ### Модели
 
 | Слой   | Модель               | Поля                                                                         |
 |:-------|:---------------------|:-----------------------------------------------------------------------------|
-| Domain | `Tag`                | `id: Int`, `name: String`, `colorHex: String`                                |
+| Domain | `Tag`                | `id: Int`, `name: String`, `colorHex: String`, **`emoji: String? = null`**   |
 | Domain | `TagColor` (enum)    | 7 цветов macOS: `RED`, `ORANGE`, `YELLOW`, `GREEN`, `BLUE`, `PURPLE`, `GRAY` |
-| Data   | `TagModel` (@Entity) | `id`, `Name`, `ColorHex`                                                     |
+| Data   | `TagModel` (@Entity) | `id`, `Name`, `ColorHex`, **`Emoji: String?`**                               |
 | Data   | `NoteTagCrossRef`    | `noteId`, `tagId` (composite PK)                                             |
 | Data   | `TaskTagCrossRef`    | `taskId`, `tagId` (composite PK)                                             |
 | Data   | `EventTagCrossRef`   | `eventId`, `tagId` (composite PK)                                            |
 
+> **Почему `emoji` — опциональное:** тег без эмодзи отображается как раньше
+> (цветная точка в `TagChip`). Поле `null` не ломает существующие данные и
+> даёт пользователю выбор.
+
+### Кастомизация тега
+
+| Параметр     | Варианты                                                                                                                | Где задаётся        |
+|:-------------|:------------------------------------------------------------------------------------------------------------------------|:--------------------|
+| **Цвет**     | 7 цветов: 🔴 🔴 Оранжевый · 🟡 · 🟢 · 🔵 · 🟣 · ⚫                                                                      | `CreateTagDialog`   |
+| **Эмодзи**   | 200+ эмодзи в 10 категориях (Смайлы, Работа, Идеи, Учёба, Дом, Еда, Природа, Спорт, Путешествия, Символы) — опционально | `EmojiPickerDialog` |
+| **Название** | любая непустая строка (trim)                                                                                            | `CreateTagDialog`   |
+
+### Отображение в UI
+
+| Компонент        | Где используется                      | Как выглядит с эмодзи                                  |
+|:-----------------|:--------------------------------------|:-------------------------------------------------------|
+| `TagChip`        | Редакторы, `TagPickerDialog`          | Эмодзи в `leadingIcon` вместо цветной точки            |
+| `CompactTagChip` | `NoteItem`, `TaskItem`, `EventItem`   | `"🎯 Цели"` — эмодзи + пробел + название               |
+
+### Каталог эмодзи (`EmojiCatalog`)
+
+`EmojiCatalog` — объект с `data class Category(name: String, emojis: List<String>)`
+и `val categories: List<Category>`. 10 категорий × ~20 эмодзи = 200+ штук.
+
+```kotlin
+object EmojiCatalog {
+    data class Category(val name: String, val emojis: List<String>)
+    val categories: List<Category> = listOf(
+        Category("Смайлы", listOf("😀", "😃", ...)),
+        Category("Работа", listOf("💼", "🖥️", ...)),
+        Category("Идеи", listOf("💡", "🎯", ...)),
+        Category("Учёба", listOf("📚", "📖", ...)),
+        Category("Дом", listOf("🏠", "🏡", ...)),
+        Category("Еда", listOf("☕", "🍵", ...)),
+        Category("Природа", listOf("🌿", "🌸", ...)),
+        Category("Спорт", listOf("⚽", "🏀", ...)),
+        Category("Путешествия", listOf("✈️", "🚀", ...)),
+        Category("Символы", listOf("❤️", "🧡", ...))
+    )
+}
+```
+
+Каталог **статический** — не требует сети, не зависит от версии ОС.
+Добавление новых эмодзи — только правка кода. Для расширения можно
+подключить JSON-ресурс или `com.vanniktech:emoji-*`.
+
 ### Use Cases
 
-| Use Case                  | Вход                     | Выход              | Назначение                             |
-|:--------------------------|:-------------------------|:-------------------|:---------------------------------------|
-| `GetAllTagsUseCase`       | —                        | `Flow<List<Tag>>`  | Список всех тегов для picker'а         |
-| `CreateTagUseCase`        | `name, color`            | `Long` (id)        | Создать тег с валидацией               |
-| `UpdateTagUseCase`        | `tag, newName, newColor` | —                  | Переименовать / сменить цвет           |
-| `DeleteTagUseCase`        | `tag`                    | —                  | Удалить (каскадно снимет все привязки) |
-| `GetTagsForNoteUseCase`   | `noteId`                 | `Flow<List<Tag>>`  | Теги заметки                           |
-| `GetTagsForTaskUseCase`   | `taskId`                 | `Flow<List<Tag>>`  | Теги задачи                            |
-| `GetTagsForEventUseCase`  | `eventId`                | `Flow<List<Tag>>`  | Теги события                           |
-| `ToggleTagOnNoteUseCase`  | `noteId, tag`            | `Boolean` (added?) | Переключить тег на заметке             |
-| `ToggleTagOnTaskUseCase`  | `taskId, tag`            | `Boolean` (added?) | Переключить тег на задаче              |
-| `ToggleTagOnEventUseCase` | `eventId, tag`           | `Boolean` (added?) | Переключить тег на событии             |
+| Use Case                  | Вход                                        | Выход              | Назначение                             |
+|:--------------------------|:--------------------------------------------|:-------------------|:---------------------------------------|
+| `GetAllTagsUseCase`       | —                                           | `Flow<List<Tag>>`  | Список всех тегов для picker'а         |
+| `CreateTagUseCase`        | `name, color, emoji: String? = null`        | `Long` (id)        | Создать тег с валидацией               |
+| `UpdateTagUseCase`        | `tag, newName, newColor, newEmoji: String?` | —                  | Переименовать / сменить цвет / эмодзи  |
+| `DeleteTagUseCase`        | `tag`                                       | —                  | Удалить (каскадно снимет все привязки) |
+| `GetTagsForNoteUseCase`   | `noteId`                                    | `Flow<List<Tag>>`  | Теги заметки                           |
+| `GetTagsForTaskUseCase`   | `taskId`                                    | `Flow<List<Tag>>`  | Теги задачи                            |
+| `GetTagsForEventUseCase`  | `eventId`                                   | `Flow<List<Tag>>`  | Теги события                           |
+| `ToggleTagOnNoteUseCase`  | `noteId, tag`                               | `Boolean` (added?) | Переключить тег на заметке             |
+| `ToggleTagOnTaskUseCase`  | `taskId, tag`                               | `Boolean` (added?) | Переключить тег на задаче              |
+| `ToggleTagOnEventUseCase` | `eventId, tag`                              | `Boolean` (added?) | Переключить тег на событии             |
 
 ### UI-компоненты
 
-| Компонент         | Где используется                                     | Описание                                                |
-|:------------------|:-----------------------------------------------------|:--------------------------------------------------------|
-| `TagChip`         | Редакторы, `TagPickerDialog`                         | `FilterChip` с цветным кружком и опциональной кнопкой × |
-| `CompactTagChip`  | `NoteItem`, `TaskItem`, `EventItem`                  | Компактная цветная «плашка» для карточек в списках      |
-| `CreateTagDialog` | Везде через `TagPickerDialog`                        | Диалог с полем имени и палитрой из 7 цветов             |
-| `TagPickerDialog` | `NoteEditScreen`, `TaskEditScreen`, `AddEventDialog` | Список всех тегов с `FilterChip` + кнопка «Создать тег» |
+| Компонент           | Где используется                                     | Описание                                                                   |
+|:--------------------|:-----------------------------------------------------|:---------------------------------------------------------------------------|
+| `TagChip`           | Редакторы, `TagPickerDialog`                         | `FilterChip` с эмодзи (или цветным кружком) и опциональной кнопкой ×       |
+| `CompactTagChip`    | `NoteItem`, `TaskItem`, `EventItem`                  | Компактная цветная «плашка» с эмодзи перед названием                       |
+| `CreateTagDialog`   | Везде через `TagPickerDialog`                        | Диалог с превью, полем имени, кнопкой «Добавить эмодзи», палитрой 7 цветов |
+| `TagPickerDialog`   | `NoteEditScreen`, `TaskEditScreen`, `AddEventDialog` | Список всех тегов с `FilterChip` + кнопка «Создать тег»                    |
+| `EmojiCatalog`      | `EmojiPickerDialog`                                  | Объект с каталогом 200+ эмодзи в 10 категориях                             |
+| `EmojiPickerDialog` | `CreateTagDialog`                                    | Диалог с `FilterChip`-категориями и `LazyVerticalGrid` эмодзи              |
 
 ### Особенность: теги для новой сущности
 
@@ -184,6 +250,19 @@ abstract class PageBookDatabase : RoomDatabase() {
 в `selectedTags` (`NewNote`, `NewTask`) или `_pendingTags` (`CalendarViewModel`),
 а после `save*` (когда `id` сгенерирован Room) — привязывает через
 `tagRepository.addTagTo*`.
+
+### Особенность: сигнатура `createAndToggleTag`
+
+Во всех ViewModel (`NoteEditViewModel`, `TaskEditViewModel`,
+`CalendarViewModel`) метод имеет сигнатуру:
+
+```kotlin
+fun createAndToggleTag(name: String, color: TagColor, emoji: String? = null)
+```
+
+`AddEventDialog` получает `onCreateTag: (name: String, color: TagColor, emoji: String?) -> Unit`
+через параметры — **не обращается к `viewModel` напрямую** (это чистый
+Composable без ViewModel).
 
 ## 🔄 Поток данных
 
@@ -212,7 +291,7 @@ sequenceDiagram
 ```
 
 **Особенность:** `getAllWithTags()` — `@Transaction`-запрос с `@Relation`,
-теги загружаются одним SQL-запросом, без N+1.
+теги (с эмодзи) загружаются одним SQL-запросом, без N+1.
 
 ### Пример 2: создание заметки с тегами
 
@@ -239,10 +318,31 @@ sequenceDiagram
 
 **Особенность:** экран закрывается **только после** завершения сохранения
 и привязки тегов — через `_isSaved: StateFlow<Boolean>` и `LaunchedEffect`.
-Это устраняет race condition, когда `onBack()` вызывался сразу после
-`viewModel.save()`, и ViewModel уничтожался раньше, чем корутина завершалась.
+Это устраняет race condition.
 
-### Пример 3: список задач (Tasks)
+### Пример 3: создание тега с эмодзи
+
+```mermaid
+sequenceDiagram
+    participant UI as CreateTagDialog
+    participant EP as EmojiPickerDialog
+    participant VM as NoteEditViewModel
+    participant UC as CreateTagUseCase
+    participant DB as PageBookDatabase
+
+    UI->>UI: name, color, showEmojiPicker = true
+    UI->>EP: открыть picker
+    EP-->>UI: onEmojiSelected("🎯")
+    UI->>UI: preview обновлён
+    UI->>VM: onConfirm(name, color, emoji = "🎯")
+    VM->>UC: invoke(name, color, "🎯")
+    UC->>DB: INSERT INTO tags (Name, ColorHex, Emoji)
+    DB-->>UC: tagId
+    UC-->>VM: tagId
+    VM->>VM: toggleTag(Tag(..., emoji = "🎯"))
+```
+
+### Пример 4: список задач (Tasks)
 
 ```mermaid
 sequenceDiagram
@@ -262,10 +362,7 @@ sequenceDiagram
     VM-->>UI: StateFlow<TaskListUiState.Success>
 ```
 
-**Особенность:** сортировка `IsCompleted ASC, AtCreated DESC` — незавершённые
-сверху, внутри группы новые первыми.
-
-### Пример 4: календарь (Events)
+### Пример 5: календарь (Events)
 
 ```mermaid
 sequenceDiagram
@@ -286,11 +383,7 @@ sequenceDiagram
     VM-->>UI: StateFlow<CalendarUiState>
 ```
 
-**Особенность:** UI-состояние собирается через `combine` трёх источников —
-список событий, выбранная дата, флаг диалога. Фильтрация «события выбранного
-дня» — во ViewModel, UI получает готовый `eventsForSelectedDate`.
-
-### Пример 5: создание задачи из заметки через ML Kit
+### Пример 6: создание задачи из заметки через ML Kit
 
 ```mermaid
 sequenceDiagram
@@ -335,6 +428,8 @@ sequenceDiagram
 | **`contentPadding` в LazyColumn/Grid**           | Правильный edge-to-edge.                                                               |
 | **Одна `PageBookDatabase`**                      | Необходимо для `ForeignKey` между Note/Task/Event и Tag.                               |
 | **Junction-таблицы для тегов**                   | Классический many-to-many; каскадное удаление через `onDelete = CASCADE`.              |
+| **`emoji: String?` в Tag**                       | Опционально — не ломает существующие теги, пользователь сам решает, нужен ли эмодзи.   |
+| **`EmojiCatalog` — статический объект**          | 200+ эмодзи не требуют сети и не зависят от ОС; правка кода = расширение каталога.     |
 | **`_pendingTags` / `selectedTags`**              | Обходной путь для привязки тегов к ещё не сохранённым сущностям.                       |
 | **`_isSaved: StateFlow<Boolean>`**               | Экран закрывается только после завершения сохранения — нет race condition.             |
 | **`combine` во ViewModel**                       | Множественные источники (список + выбранная дата + флаг) — один `StateFlow`.           |
@@ -347,7 +442,8 @@ sequenceDiagram
 
 - **Rich Text** — HTML через `richeditor-compose`.
 - **Адаптивная сетка** — `StaggeredGridCells.Adaptive(minSize = 160.dp)`.
-- **Теги на карточке** — до 3 `CompactTagChip` + `+N`.
+- **Теги на карточке** — до 3 `CompactTagChip` + `+N`; эмодзи отображается
+  перед названием (`"🎯 Цели"`).
 - **Удаление** — каскадно удаляет `NoteTagCrossRef` (через `onDelete = CASCADE`).
   Задачи теряют `noteId` (`SET_NULL`), но остаются.
 
@@ -358,7 +454,7 @@ sequenceDiagram
 - **Сортировка** — `IsCompleted ASC, AtCreated DESC`.
 - **Создание из заметки** — `CreateTaskFromNoteUseCase` через ML Kit
   (UI пока не подключён — в roadmap).
-- **Теги на карточке** — до 3 `CompactTagChip` + `+N`.
+- **Теги на карточке** — до 3 `CompactTagChip` + `+N` с эмодзи.
 
 ### Calendar
 
@@ -367,8 +463,11 @@ sequenceDiagram
   к месяцу выбранного дня.
 - **Фильтрация во ViewModel** — через `combine`, UI получает готовый список.
 - **Теги в диалоге** — `AddEventDialog` содержит кнопку «Добавить теги»,
-  открывающую `TagPickerDialog`. `pendingTags` сбрасываются при отмене или
-  после сохранения.
+  открывающую `TagPickerDialog`. Выбор эмодзи доступен через
+  `CreateTagDialog` (кнопка «Добавить эмодзи» → `EmojiPickerDialog`).
+- **`AddEventDialog` — чистый Composable без ViewModel**: получает
+  `onCreateTag: (String, TagColor, String?) -> Unit` через параметры
+  (не `viewModel.createAndToggleTag` напрямую).
 
 ## 🚀 Планы по развитию
 
@@ -376,12 +475,16 @@ sequenceDiagram
 - [x] Выделить **Domain Layer** (Use Cases) для Notes, Tasks, Events.
 - [x] Переименовать Todo → Task.
 - [x] Подключить **ML Kit** для извлечения дат из заметок.
-- [x] Объединить три БД в одну `PageBookDatabase`.
+- [x] Объединить три БД в одну `PageBookDatabase` (version 3).
 - [x] Добавить **сквозную систему тегов** (7 цветов, many-to-many).
+- [x] Добавить **эмодзи-кастомизацию тегов** (200+ эмодзи в 10 категориях).
 - [x] Добавить `DataStore` для настроек (тема, язык).
 - [ ] Реализовать UI для `CreateTaskFromNoteUseCase` в `NoteEditScreen`.
 - [ ] Фильтрация списков по тегам (Notes / Tasks / Calendar).
-- [ ] Редактирование существующих тегов (имя/цвет) в UI.
+- [ ] Редактирование существующих тегов (имя/цвет/эмодзи) в UI.
+- [ ] **Поиск по эмодзи** в `EmojiPickerDialog` (TextField + фильтрация).
+- [ ] **Недавние эмодзи** (последние 20 в `DataStore`, отдельная категория).
+- [ ] **Счётчик использования тега** (сколько заметок/задач/событий).
 - [ ] Модуляризация (feature-модули).
 - [ ] Unit-тесты для Use Cases и Repository.
 - [ ] WorkManager для напоминаний о задачах.
@@ -397,3 +500,4 @@ sequenceDiagram
 - [Room — Foreign Keys](https://developer.android.com/training/data-storage/room/relationships#foreign-keys)
 - [DataStore — Preferences](https://developer.android.com/topic/libraries/architecture/datastore)
 - [Hilt — `@Binds`](https://developer.android.com/training/dependency-injection/hilt-android#hilt-modules)
+- [Unicode Emoji Chart](https://unicode.org/emoji/charts/full-emoji-list.html)

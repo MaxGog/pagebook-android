@@ -88,10 +88,15 @@ class NoteEditViewModel @Inject constructor(
         }
     }
 
-    fun createAndToggleTag(name: String, color: TagColor) {
+    fun createAndToggleTag(name: String, color: TagColor, emoji: String? = null) {
         viewModelScope.launch {
-            val tagId = createTag(name, color)
-            val tag = Tag(id = tagId.toInt(), name = name.trim(), colorHex = color.hex)
+            val tagId = createTag(name, color, emoji)
+            val tag = Tag(
+                id = tagId.toInt(),
+                name = name.trim(),
+                colorHex = color.hex,
+                emoji = emoji
+            )
             toggleTag(tag)
         }
     }

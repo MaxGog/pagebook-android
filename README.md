@@ -26,34 +26,36 @@ PageBook — это нативное Android-приложение для раб�
 - Создание и редактирование заметок с rich-text форматированием
 - Адаптивная сетка заметок (StaggeredGrid)
 - Создание задач прямо из заметок с автоматическим извлечением дат
-- **Цветные теги** с палитрой из 7 цветов (как в macOS Finder)
+- **Цветные теги с эмодзи** — палитра из 7 цветов + каталог из 200+ эмодзи
 
 ### ✅ Менеджер задач
 - Задачи с напоминаниями и связью с заметками
 - Сортировка: незавершённые сверху, новые первыми
 - Автоматическое определение даты из текста заметки (ML Kit)
-- **Цветные теги** — общие с заметками и календарём
+- **Цветные теги с эмодзи** — общие с заметками и календарём
 
 ### 🗓️ Календарь и планирование
 - Ежедневное планирование событий с выбором даты и времени
 - Реактивное обновление при изменении событий
 - Быстрый скролл к выбранной дате
-- **Цветные теги** для категоризации событий
+- **Цветные теги с эмодзи** для категоризации событий
 
 ### ⚙️ Настройки
 - Переключение темы: **System / Light / Dark** (сохраняется в `DataStore`)
 - Переключение языка: **Русский / English** через `AppCompatDelegate`
 - **Реактивное** применение без перезапуска приложения
 
-### 🏷️ Сквозные теги
-Один тег — на заметке, задаче и событии одновременно. Реализовано через
-many-to-many (junction-таблицы) в единой `PageBookDatabase`.
+### 🏷️ Сквозные теги с эмодзи
+Один тег — на заметке, задаче и событии одновременно. Каждый тег можно
+кастомизировать цветом (7 вариантов в стиле macOS) и **эмодзи из каталога
+на 200+ штук** в 10 категориях. Реализовано через many-to-many
+(junction-таблицы) в единой `PageBookDatabase`.
 
 ## 🛠 Технологический стек
 
 - **💚 100% Kotlin** — Kotlin 2.2.20
 - **🎨 Jetpack Compose** — BOM 2026.09.00, Material 3 Expressive
-- **💾 Room Database** — единая `PageBookDatabase` (7 entities, version 2)
+- **💾 Room Database** — единая `PageBookDatabase` (7 entities, version 3)
 - **⚙️ DataStore Preferences** — хранение настроек (тема, язык)
 - **🔄 Coroutines & Flow** — реактивное программирование
 - **🧩 Hilt** — внедрение зависимостей (`@Binds` + `@Provides`)
@@ -114,7 +116,7 @@ app/src/main/java/ru/maxgog/pagebook/
 ├── data/
 │   ├── dao/            # NoteDao, TaskDao, EventDao, TagDao
 │   ├── models/         # Room-сущности (@Entity) + *WithTags (@Relation)
-│   ├── rooms/          # PageBookDatabase (единая БД)
+│   ├── rooms/          # PageBookDatabase (единая БД) + Migrations
 │   ├── mapper/         # NoteMapper, TaskMapper, EventMapper, TagMapper
 │   ├── repository/     # *RepositoryImpl, SettingsRepository (DataStore)
 │   └── di/             # DatabaseModule, RepositoryModule, DataStoreModule
@@ -133,7 +135,8 @@ app/src/main/java/ru/maxgog/pagebook/
 ├── ui/
 │   ├── app/            # CombinedApp (корневой Scaffold)
 │   ├── navigation/     # Destinations, AppNavHost, BottomNavBar
-│   ├── components/     # TagChip, CompactTagChip, CreateTagDialog, TagPickerDialog
+│   ├── components/     # TagChip, CompactTagChip, CreateTagDialog,
+│   │                   #   TagPickerDialog, EmojiCatalog, EmojiPickerDialog
 │   ├── notes/          # NotesScreen, NotesViewModel, NotesUiState, NoteItem
 │   ├── note_edit/      # NoteEditScreen, NoteEditViewModel, NoteEditUiState
 │   ├── tasks/          # TaskListScreen, TaskEditScreen, TaskItem,
@@ -150,26 +153,37 @@ app/src/main/java/ru/maxgog/pagebook/
 
 ## 🧩 Функциональные возможности
 
-| Модуль | Возможности | Технологии |
-|--------|-------------|------------|
-| **Notes** 📝 | Rich-text заметки, адаптивная сетка, ML Kit для извлечения дат, **теги** | Compose, Room, RichEditor, ML Kit |
-| **Tasks** ✅ | Задачи с напоминаниями, связь с заметками (`noteId`), сортировка, **теги** | Compose, StateFlow, Room |
-| **Calendar** 🗓️ | События по датам, реактивное обновление, автоскролл, **теги** | Compose, kizitonwose Calendar, Room |
-| **Settings** ⚙️ | Тема (System/Light/Dark), язык (ru/en) через DataStore | Compose, DataStore, AppCompat |
-| **Tags** 🏷️ | Сквозные цветные теги (7 цветов macOS) через many-to-many | Room (@Relation + @Junction), Hilt |
+| Модуль          | Возможности                                                                         | Технологии                          |
+|-----------------|-------------------------------------------------------------------------------------|-------------------------------------|
+| **Notes** 📝    | Rich-text заметки, адаптивная сетка, ML Kit для извлечения дат, **теги с эмодзи**   | Compose, Room, RichEditor, ML Kit   |
+| **Tasks** ✅    | Задачи с напоминаниями, связь с заметками (`noteId`), сортировка, **теги с эмодзи** | Compose, StateFlow, Room            |
+| **Calendar** 🗓️ | События по датам, реактивное обновление, автоскролл, **теги с эмодзи**              | Compose, kizitonwose Calendar, Room |
+| **Settings** ⚙️ | Тема (System/Light/Dark), язык (ru/en) через DataStore                              | Compose, DataStore, AppCompat       |
+| **Tags** 🏷️     | Сквозные теги: 7 цветов macOS + **200+ эмодзи** в 10 категориях                     | Room (@Relation + @Junction), Hilt  |
 
 ## 🏷️ Система тегов
 
 Теги — **сквозная фича** приложения. Один тег может быть привязан
-к заметке, задаче и событию одновременно.
+к заметке, задаче и событию одновременно. Каждый тег кастомизируется
+цветом и эмодзи.
 
-| Слой | Компоненты |
-| :--- | :--- |
-| **Domain** | `Tag`, `TagColor` (7 цветов macOS), 10 Use Cases в `usecase/tag/` |
-| **Data** | `TagModel`, 3 junction-таблицы (`NoteTagCrossRef`, `TaskTagCrossRef`, `EventTagCrossRef`), `TagDao`, `TagRepositoryImpl` |
-| **UI** | `TagChip`, `CompactTagChip`, `CreateTagDialog`, `TagPickerDialog` |
+| Слой       | Компоненты                                                                                                                                   |
+|:-----------|:---------------------------------------------------------------------------------------------------------------------------------------------|
+| **Domain** | `Tag` (id, name, colorHex, **emoji: String?**), `TagColor` (7 цветов macOS), 10 Use Cases в `usecase/tag/`                                   |
+| **Data**   | `TagModel` (+ колонка `Emoji`), 3 junction-таблицы (`NoteTagCrossRef`, `TaskTagCrossRef`, `EventTagCrossRef`), `TagDao`, `TagRepositoryImpl` |
+| **UI**     | `TagChip`, `CompactTagChip`, `CreateTagDialog`, `TagPickerDialog`, **`EmojiCatalog`** (200+ эмодзи), **`EmojiPickerDialog`**                 |
 
-Палитра: 🔴 Красный · 🟠 Оранжевый · 🟡 Жёлтый · 🟢 Зелёный · 🔵 Синий · 🟣 Фиолетовый · ⚫ Серый.
+### Кастомизация тега
+
+| Параметр     | Варианты                                                                                                                | Где задаётся        |
+|:-------------|:------------------------------------------------------------------------------------------------------------------------|:--------------------|
+| **Цвет**     | 7 цветов: 🔴 Красный · 🟠 Оранжевый · 🟡 Жёлтый · 🟢 Зелёный · 🔵 Синий · 🟣 Фиолетовый · ⚫ Серый                      | `CreateTagDialog`   |
+| **Эмодзи**   | 200+ эмодзи в 10 категориях (Смайлы, Работа, Идеи, Учёба, Дом, Еда, Природа, Спорт, Путешествия, Символы) — опционально | `EmojiPickerDialog` |
+| **Название** | любая строка (trim, непустая)                                                                                           | `CreateTagDialog`   |
+
+**Отображение:**
+- **`TagChip`** (редакторы, picker) — если эмодзи задан, показывается вместо цветной точки в `leadingIcon`.
+- **`CompactTagChip`** (карточки в списках) — эмодзи идёт перед названием: `"🎯 Цели"`.
 
 ## 🛠 Разработка
 
@@ -208,10 +222,13 @@ app/src/main/java/ru/maxgog/pagebook/
 - [x] **Единая PageBookDatabase** с `ForeignKey` между сущностями
 - [x] **Сквозные теги** (7 цветов, many-to-many) во всех модулях
 - [x] **DataStore** для настроек (тема + язык)
+- [x] **Эмодзи-кастомизация тегов** (200+ эмодзи в 10 категориях)
 - [ ] **UI для создания задач из заметок** 🤖
 - [ ] **Фильтрация списков по тегам** в Notes / Tasks / Calendar
-- [ ] **Редактирование существующих тегов** (имя/цвет)
+- [ ] **Редактирование существующих тегов** (имя/цвет/эмодзи)
 - [ ] **Счётчик использования тега** (сколько заметок/задач/событий)
+- [ ] **Поиск по эмодзи** в `EmojiPickerDialog`
+- [ ] **Недавние эмодзи** (последние 20 в `DataStore`)
 - [ ] **Синхронизация с облаком** ☁️
 - [ ] **Виджеты для главного экрана** 🏠
 - [ ] **Резервное копирование** 💾
