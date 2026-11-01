@@ -17,6 +17,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.maxgog.pagebook.R
 import ru.maxgog.pagebook.ui.app.EmptyState
 import ru.maxgog.pagebook.ui.components.OverflowMenu
+import ru.maxgog.pagebook.ui.components.TagFilterRow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,14 +28,14 @@ fun TaskListScreen(
     viewModel: TaskListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val allTags by viewModel.allTags.collectAsStateWithLifecycle()
+    val selectedTagIds by viewModel.selectedTagIds.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text(stringResource(R.string.todo_list)) },
-                actions = {
-                    OverflowMenu(onSettingsClick = onSettingsClick)
-                }
+                actions = { OverflowMenu(onSettingsClick = onSettingsClick) }
             )
         },
         floatingActionButton = {
@@ -45,35 +46,56 @@ fun TaskListScreen(
             )
         }
     ) { innerPadding ->
-        when (val state = uiState) {
-            is TaskListUiState.Loading -> Box(
-                Modifier.fillMaxSize().padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) { CircularProgressIndicator() }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            if (allTags.isNotEmpty()) {
+                TagFilterRow(
+                    allTags = allTags,
+                    selectedTagIds = selectedTagIds,
+                    onToggleTag = viewModel::toggleTagFilter,
+                    onClearFilters = viewModel::clearTagFilter,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
 
-            is TaskListUiState.Error -> EmptyState(
-                text = state.message,
-                modifier = Modifier.padding(innerPadding)
-            )
+            Box(Modifier.weight(1f)) {
+                when (val state = uiState) {
+                    is TaskListUiState.Loading -> Box(
+                        Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) { CircularProgressIndicator() }
 
-            is TaskListUiState.Success -> {
-                if (state.tasks.isEmpty()) {
-                    EmptyState(
-                        text = stringResource(R.string.no_tasks),
-                        modifier = Modifier.padding(innerPadding)
+                    is TaskListUiState.Error -> EmptyState(
+                        text = state.message,
+                        modifier = Modifier.fillMaxSize()
                     )
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = innerPadding,
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        items(state.tasks, key = { it.id }) { task ->
-                            TaskItem(
-                                task = task,
-                                onToggle = { viewModel.toggleCompleted(task) },
-                                onClick = { onTaskClick(task.id) }
+
+                    is TaskListUiState.Success -> {
+                        if (state.tasks.isEmpty()) {
+                            EmptyState(
+                                text = if (selectedTagIds.isEmpty())
+                                    stringResource(R.string.no_tasks)
+                                else
+                                    stringResource(R.string.no_matching_items),
+                                modifier = Modifier.fillMaxSize()
                             )
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(horizontal = 12.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                items(state.tasks, key = { it.id }) { task ->
+                                    TaskItem(
+                                        task = task,
+                                        onToggle = { viewModel.toggleCompleted(task) },
+                                        onClick = { onTaskClick(task.id) }
+                                    )
+                                }
+                            }
                         }
                     }
                 }

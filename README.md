@@ -29,6 +29,7 @@ PageBook — это нативное Android-приложение для раб�
 - Превью вложений прямо в редакторе, скачивание в `Pictures`/`Downloads`
 - Создание задач прямо из заметок с автоматическим извлечением дат
 - **Цветные теги с эмодзи** — палитра из 7 цветов + каталог из 200+ эмодзи
+- **Фильтрация списка по тегам** — ряд чипов над сеткой, OR-логика, кнопка «Сбросить»
 
 ### ✅ Менеджер задач
 - Задачи с напоминаниями и связью с заметками
@@ -36,12 +37,14 @@ PageBook — это нативное Android-приложение для раб�
 - Автоматическое определение даты из текста заметки (ML Kit)
 - **Вложения**: те же компоненты, что и в заметках (общая подсистема)
 - **Цветные теги с эмодзи** — общие с заметками и календарём
+- **Фильтрация по тегам** — общий компонент `TagFilterRow`
 
 ### 🗓️ Календарь и планирование
 - Ежедневное планирование событий с выбором даты и времени
 - Реактивное обновление при изменении событий
 - Быстрый скролл к выбранной дате
 - **Цветные теги с эмодзи** для категоризации событий
+- **Фильтрация по тегам** — сужает и список событий, и точки-индикаторы на днях месяца
 
 ### ⚙️ Настройки и пасхалка
 - Переключение темы: **System / Light / Dark** (сохраняется в `DataStore`)
@@ -58,11 +61,18 @@ PageBook — это нативное Android-приложение для раб�
 - **Надежность**: базируется на `Channel` и `@Singleton` через Hilt (гарантирует доставку ровно один раз).
 - Больше не нужно дублировать `SnackbarHost` на каждом экране — всё управляется из `MainActivity`.
 
-### 🏷️ Сквозные теги с эмодзи
+### 🏷️ Сквозные теги с эмодзи и фильтрацией
 Один тег — на заметке, задаче и событии одновременно. Каждый тег можно
 кастомизировать цветом (7 вариантов в стиле macOS) и **эмодзи из каталога
 на 200+ штук** в 10 категориях. Реализовано через many-to-many
 (junction-таблицы) в единой `PageBookDatabase`.
+
+На всех трёх главных экранах — **ряд тегов-фильтров** (`TagFilterRow`):
+- Чипы-фильтры (`FilterChip`) над списком, выбранные залиты цветом тега.
+- **OR-логика**: показываются элементы, у которых есть хотя бы один из выбранных тегов.
+- Кнопка **«Сбросить»** появляется в конце ряда, когда фильтр активен.
+- Пустой результат → «Ничего не найдено» вместо «Нет заметок/задач/событий».
+- **В календаре** фильтр сужает и список событий дня, и точки-индикаторы на днях месяца.
 
 ### 📎 Вложения (Attachments)
 Изображения и файлы, прикреплённые к заметкам или задачам. Общая подсистема:
@@ -86,6 +96,7 @@ PageBook — это нативное Android-приложение для раб�
 - **💾 Room Database** — единая `PageBookDatabase` (8 entities, version 4)
 - **📎 Attachments** — app-private storage + MediaStore, Photo Picker
 - **🔔 Notifications** — глобальный `SnackbarHost` + `Channel` + Hilt Singleton
+- **🏷️ Tag filtering** — `TagFilterRow` (`FilterChip` + OR-логика) + `combine` во ViewModel
 - **⚙️ DataStore Preferences** — хранение настроек (тема)
 - **🌐 AppCompatDelegate** — смена языка (per-app language preferences)
 - **🔄 Coroutines & Flow** — реактивное программирование + `Channel` для one-shot событий
@@ -107,17 +118,19 @@ graph TD
    C --> G[(filesDir/attachments<br/>app-private)]
    
    A -.->|AppNotificationManager| H[Global Snackbar<br/>FursonaSnackbar]
+   A -.->|_selectedTagIds| I[TagFilterRow<br/>FilterChip + OR-логика]
    C -.-> E[(Remote - Future)]
 ```
 
 ### Clean Architecture
-- **UI Layer**: Jetpack Compose + ViewModel + UiState (sealed interface / data class). Глобальный `Snackbar` управляется из `MainActivity` через `AppNotificationHost`.
+- **UI Layer**: Jetpack Compose + ViewModel + UiState (sealed interface / data class). Глобальный `Snackbar` управляется из `MainActivity` через `AppNotificationHost`. Фильтр тегов — часть UiState ViewModel.
 - **Domain Layer**: Use Cases, доменные модели (Note, Task, Event, Tag, TagColor, Attachment), интерфейсы репозиториев
 - **Data Layer**: Room, DAO, мапперы, реализации репозиториев, DataStore, файловое хранилище (`AttachmentFileStore`, `MediaStoreDownloader`), Hilt-модули
 - **Core Layer**: `AppNotificationManager` (синглтон для событий UI).
 
 Все три модуля — **Notes**, **Tasks**, **Calendar** — полностью на Clean Architecture.
-Теги работают сквозь все три модуля через единую `PageBookDatabase`.
+Теги работают сквозь все три модуля через единую `PageBookDatabase`,
+включая **фильтрацию списков по тегам** (OR-логика, единый паттерн).
 Вложения — полиморфная связь (`ownerType` + `ownerId`) через общую таблицу.
 
 Подробнее см. в [ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -183,8 +196,9 @@ app/src/main/java/ru/maxgog/pagebook/
 │   ├── app/            # CombinedApp, MainViewModel
 │   ├── navigation/     # Destinations, AppNavHost, BottomNavBar
 │   ├── notification/   # AppNotificationHost, FursonaSnackbar, FursonaSnackbarVisuals
-│   ├── components/     # TagChip, CompactTagChip, CreateTagDialog,
-│   │                   #   TagPickerDialog, EmojiCatalog, EmojiPickerDialog,
+│   ├── components/     # TagChip, CompactTagChip, TagFilterRow,
+│   │                   #   CreateTagDialog, TagPickerDialog,
+│   │                   #   EmojiCatalog, EmojiPickerDialog,
 │   │                   #   OverflowMenu, AttachmentPreviewList,
 │   │                   #   AttachmentImageLoader, AttachmentPicker,
 │   │                   #   ResizeImageDialog
@@ -204,15 +218,26 @@ app/src/main/java/ru/maxgog/pagebook/
 
 ## 🧩 Функциональные возможности
 
-| Модуль             | Возможности                                                                                                    | Технологии                                     |
-|--------------------|----------------------------------------------------------------------------------------------------------------|------------------------------------------------|
-| **Notes** 📝       | Rich-text заметки, адаптивная сетка, ML Kit для извлечения дат, **теги с эмодзи**, **вложения (фото + файлы)** | Compose, Room, RichEditor, ML Kit, PhotoPicker |
-| **Tasks** ✅       | Задачи с напоминаниями, связь с заметками (`noteId`), сортировка, **теги с эмодзи**, **вложения**              | Compose, StateFlow, Room                       |
-| **Calendar** 🗓️    | События по датам, реактивное обновление, автоскролл, **теги с эмодзи**                                         | Compose, kizitonwose Calendar, Room            |
-| **Settings** ⚙️    | Тема (System/Light/Dark), язык (ru/en), **пасхалка с фурсоной**, **аватар разработчика**                       | Compose, DataStore, AppCompat                  |
-| **Notifications** 🔔 | Глобальные уведомления (SUCCESS/ERROR/INFO/EASTER_EGG) с аватаром-фурсоной, выходящим за края `Snackbar`     | Compose, Channel, Hilt                         |
-| **Tags** 🏷️        | Сквозные теги: 7 цветов macOS + **200+ эмодзи** в 10 категориях                                                | Room (@Relation + @Junction), Hilt             |
-| **Attachments** 📎 | App-private storage + MediaStore, Photo Picker, `@Update` для pending, `<img>` в rich-text                     | Room, ContentResolver, LocalImageLoader        |
+| Модуль             | Возможности                                                                                                                          | Технологии                                     |
+|--------------------|--------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------|
+| **Notes** 📝       | Rich-text заметки, адаптивная сетка, ML Kit для извлечения дат, **теги с эмодзи**, **фильтрация по тегам**, **вложения (фото + файлы)** | Compose, Room, RichEditor, ML Kit, PhotoPicker |
+| **Tasks** ✅       | Задачи с напоминаниями, связь с заметками (`noteId`), сортировка, **теги с эмодзи**, **фильтрация по тегам**, **вложения**              | Compose, StateFlow, Room                       |
+| **Calendar** 🗓️    | События по датам, реактивное обновление, автоскролл, **теги с эмодзи**, **фильтрация (список + точки на днях)**                        | Compose, kizitonwose Calendar, Room            |
+| **Settings** ⚙️    | Тема (System/Light/Dark), язык (ru/en), **пасхалка с фурсоной**, **аватар разработчика**                                               | Compose, DataStore, AppCompat                  |
+| **Notifications** 🔔 | Глобальные уведомления (SUCCESS/ERROR/INFO/EASTER_EGG) с аватаром-фурсоной, выходящим за края `Snackbar`                               | Compose, Channel, Hilt                         |
+| **Tags** 🏷️        | Сквозные теги: 7 цветов macOS + **200+ эмодзи**, **фильтрация в 3 модулях** (`TagFilterRow`, OR-логика)                                | Room (@Relation + @Junction), Hilt, FilterChip |
+| **Attachments** 📎 | App-private storage + MediaStore, Photo Picker, `@Update` для pending, `<img>` в rich-text                                             | Room, ContentResolver, LocalImageLoader        |
+
+## 🏷️ Фильтрация по тегам
+
+Единый UX во всех трёх модулях:
+- **`TagFilterRow`** — горизонтальный `LazyRow` из `FilterChip` (`TagChip` с `selected = true`).
+- **OR-логика**: сущность проходит, если у неё есть **хотя бы один** из выбранных тегов. Пустой набор = без фильтра.
+- **Кнопка «Сбросить»** появляется автоматически, когда фильтр активен.
+- **В календаре** фильтр сужает `datesWithEvents` — точки-индикаторы на днях автоматически пересчитываются (заодно исправлен баг: раньше точка была только у выбранного дня).
+- **Пустой результат** → «Ничего не найдено» (`no_matching_items`) вместо «Нет заметок/задач/событий».
+
+Логика вынесена во ViewModel (`_selectedTagIds: MutableStateFlow<Set<Int>>` + `combine`) — UI не знает о тегах ничего, кроме ID; фильтрация в памяти, без дополнительных DAO-запросов.
 
 ## 🔔 Система уведомлений
 
@@ -259,6 +284,7 @@ app/src/main/java/ru/maxgog/pagebook/
 - [x] **Сквозные теги** (7 цветов, many-to-many) во всех модулях
 - [x] **DataStore** для настроек (тема)
 - [x] **Эмодзи-кастомизация тегов** (200+ эмодзи в 10 категориях)
+- [x] **Фильтрация списков по тегам** в Notes / Tasks / Calendar (`TagFilterRow`, OR-логика, «Сбросить», точки в календаре)
 - [x] **UI для создания задач из заметок** 🤖 (кнопка `AddTask` в `NoteEditScreen`)
 - [x] **Material 3 Expressive** (настройки, карточки, `OverflowMenu`)
 - [x] **Адаптивный UI** (`NavigationSuiteScaffold`, `ListDetailPaneScaffold`)
@@ -268,7 +294,9 @@ app/src/main/java/ru/maxgog/pagebook/
 - [x] **Глобальная система уведомлений** (кастомный `Snackbar` с фурсоной)
 - [x] **Пасхалка** (7 тапов по версии) и аватар разработчика в настройках
 - [x] **Смена языка на Android < 13** (требуется `AppCompatActivity`)
-- [ ] **Фильтрация списков по тегам** в Notes / Tasks / Calendar
+- [ ] **Сохранение фильтра** между перезапусками (`SavedStateHandle` / `DataStore`)
+- [ ] **AND-логика фильтра** (long-press на чипе) — продвинутый UX
+- [ ] **Счётчик выбранных тегов** в `TopAppBar` (badge)
 - [ ] **Редактирование существующих тегов** (имя/цвет/эмодзи)
 - [ ] **Счётчик использования тега** (сколько заметок/задач/событий)
 - [ ] **Поиск по эмодзи** в `EmojiPickerDialog`

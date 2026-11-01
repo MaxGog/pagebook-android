@@ -138,4 +138,7 @@
     <string name="task_deleted">Задача удалена</string>
     <string name="event_added">Событие добавлено</string>
     <string name="event_deleted">Событие удалено</string>
+
+    <string name="no_matching_items">Ничего не найдено</string>
+    <string name="clear_filters">Сбросить</string>
 </resources>

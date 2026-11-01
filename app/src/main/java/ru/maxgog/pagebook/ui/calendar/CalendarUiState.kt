@@ -11,5 +11,6 @@ data class CalendarUiState(
     val selectedDate: LocalDate = Clock.System.todayIn(TimeZone.currentSystemDefault()),
     val eventsForSelectedDate: List<Event> = emptyList(),
     val showAddDialog: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val datesWithEvents: Set<LocalDate> = emptySet()
 )

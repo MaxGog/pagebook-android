@@ -29,6 +29,7 @@ import ru.maxgog.pagebook.domain.model.Event
 import ru.maxgog.pagebook.toKotlinxLocalDate
 import ru.maxgog.pagebook.ui.app.EmptyState
 import ru.maxgog.pagebook.ui.components.OverflowMenu
+import ru.maxgog.pagebook.ui.components.TagFilterRow
 import ru.maxgog.pagebook.ui.theme.AppTheme
 import java.time.YearMonth
 import java.time.format.TextStyle
@@ -43,6 +44,7 @@ fun CalendarScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val allTags by viewModel.allTags.collectAsStateWithLifecycle()
     val pendingTags by viewModel.pendingTags.collectAsStateWithLifecycle()
+    val selectedTagIds by viewModel.selectedTagIds.collectAsStateWithLifecycle()
 
     val currentMonth = remember { YearMonth.now() }
     val startMonth = remember { currentMonth.minusMonths(12) }
@@ -98,6 +100,16 @@ fun CalendarScreen(
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
+                if (allTags.isNotEmpty()) {
+                    TagFilterRow(
+                        allTags = allTags,
+                        selectedTagIds = selectedTagIds,
+                        onToggleTag = viewModel::toggleTagFilter,
+                        onClearFilters = viewModel::clearTagFilter,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
+
                 VerticalCalendar(
                     state = calendarState,
                     modifier = Modifier.weight(1f),
@@ -119,6 +131,10 @@ fun CalendarScreen(
                 EventsList(
                     events = uiState.eventsForSelectedDate,
                     onDelete = viewModel::deleteEvent,
+                    emptyText = if (selectedTagIds.isEmpty())
+                        stringResource(R.string.no_events)
+                    else
+                        stringResource(R.string.no_matching_items),
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -144,6 +160,7 @@ fun CalendarScreen(
 private fun EventsList(
     events: List<Event>,
     onDelete: (Event) -> Unit,
+    emptyText: String,
     modifier: Modifier = Modifier
 ) {
     if (events.isNotEmpty()) {
@@ -161,10 +178,7 @@ private fun EventsList(
             }
         }
     } else {
-        EmptyState(
-            text = stringResource(R.string.no_events),
-            modifier = modifier
-        )
+        EmptyState(text = emptyText, modifier = modifier)
     }
 }
 

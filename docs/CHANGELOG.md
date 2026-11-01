@@ -83,6 +83,33 @@
   (ещё не сохранённой) сущности; привязка после `save*`, когда Room
   сгенерировал `id`.
 
+**Tags — фильтрация списков по тегам (Notes / Tasks / Calendar)**
+- **Новый компонент `TagFilterRow`** (`ui/components/`) — горизонтальный
+  `LazyRow` из `FilterChip` (переиспользует `TagChip` с `selected = true`).
+  В конце ряда — `AssistChip` **«Сбросить»** (`clear_filters`), появляется
+  только при активном фильтре. Не рендерится, если `allTags` пуст.
+- **`_selectedTagIds: MutableStateFlow<Set<Int>>`** в `NotesViewModel`,
+  `TaskListViewModel`, `CalendarViewModel` + `allTags: StateFlow<List<Tag>>`
+  из `GetAllTagsUseCase`. Публичные методы `toggleTagFilter(tagId)` и
+  `clearTagFilter()`.
+- **OR-логика фильтрации** — сущность проходит, если у неё есть **хотя бы
+  один** из выбранных тегов; пустой `Set` = без фильтра. Реализовано через
+  `combine(getAll*(), _selectedTagIds)` — **без новых DAO-запросов**,
+  фильтрация в памяти по уже загруженным `@Relation tags`.
+- **`CalendarUiState.datesWithEvents: Set<LocalDate>`** — вычисляется
+  из **отфильтрованного** списка событий. Точки-индикаторы на днях
+  календаря автоматически сужаются под фильтр. **Заодно исправлен баг**:
+  раньше точка рисовалась только на выбранном дне, а не на всех днях
+  с событиями.
+- **EmptyState при активном фильтре** — новая строка
+  `R.string.no_matching_items` («Ничего не найдено» / «Nothing found»)
+  вместо «Нет заметок / задач / событий», чтобы пользователь понимал,
+  что дело в фильтре, а не в отсутствии данных.
+- **Новые строки** (`strings.xml` ru/en): `no_matching_items`,
+  `clear_filters`.
+- **Затронутые экраны**: `NotesScreen`, `TaskListScreen`, `CalendarScreen`
+  — над списком добавлен `Column` с `TagFilterRow`.
+
 **Attachments — вложения для Notes и Tasks**
 - **Domain-модели**: `Attachment` (`id`, `ownerType`, `ownerId`, `type`,
   `localPath`, `mimeType`, `displayName`, `sizeBytes`, `createdAt`),
@@ -186,6 +213,15 @@
 
 **Документация**
 - `ARCHITECTURE.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `README.md` (актуализированы).
+- **`ARCHITECTURE.md`**: добавлен подраздел **«🔍 Фильтрация списков по тегам»**
+  (паттерн, код, trade-off in-memory vs SQL), mermaid-диаграмма
+  «Фильтрация списка по тегу», две новые строки в «Ключевых архитектурных решениях»
+  (`TagFilterRow` + OR-логика, `datesWithEvents` из отфильтрованного списка),
+  ссылка на `FilterChip` в «Полезных ссылках».
+- **`README.md`**: обновлены разделы возможностей (Notes / Tasks / Calendar —
+  фильтрация), новый раздел **«🏷️ Фильтрация по тегам»**, строка
+  **🏷️ Tag filtering** в стеке, `TagFilterRow` в структуре проекта,
+  новый столбец в mermaid-диаграмме, обновлённый roadmap.
 
 ### Changed
 
@@ -244,11 +280,16 @@
   + специальное EASTER_EGG-уведомление.
 - Аватар разработчика (`leadingContent`) в `AboutSettings`.
 
+**Локализация (`res/values/strings.xml`, `res/values-ru/strings.xml`)**
+- Добавлены `no_matching_items` и `clear_filters` (ru/en) для фильтрации.
+
 **Документация**
 - `ARCHITECTURE.md`: добавлены разделы «Адаптивный UI», «One-Shot Events»,
   «Настройки (DataStore + AppCompatDelegate)», **«Подсистема вложений (Attachments)»**,
-  обновлены диаграммы (sequence для attach), БД (`version = 4`, 8 сущностей), roadmap.
-- `README.md`: обновлены стек (Adaptive, M3 Expressive, Attachments), roadmap.
+  **«Фильтрация списков по тегам»**, обновлены диаграммы (sequence для attach
+  и фильтрации), БД (`version = 4`, 8 сущностей), roadmap.
+- `README.md`: обновлены стек (Adaptive, M3 Expressive, Attachments,
+  Tag filtering), новый раздел «🏷️ Фильтрация по тегам», roadmap.
 - `CHANGELOG.md`: актуализирован.
 - `CONTRIBUTING.md`: добавлен подраздел про «ловушку» с `localPath`.
 
@@ -295,9 +336,20 @@
 - **`SettingsGroup` без заголовков** — добавлены `SettingsSection` + `supportingContent` с описаниями.
 - **`HTML` в карточках заметок** — `Text(note.content)` → `Text(AnnotatedString.fromHtml(note.content))`.
 - **`FormattingToolbar` уходил под клавиатуру** — `windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))`.
-- **Смена языка не работала** — требуется `MainActivity : AppCompatActivity` + `Theme.AppCompat.*` (в процессе).
 - **`BuildConfig` не компилировался** — `buildConfig = true` в `build.gradle.kts`.
 - **`SegmentListItem` не компилировался** — заменён на стабильные `ListItem` + `Card`.
+
+**Смена языка на Android < 13 — ✅ исправлено**
+- `MainActivity` наследуется от **`AppCompatActivity`**.
+- Родительская тема **`Theme.PageBook`** (в `themes.xml` и `values-night/themes.xml`)
+  мигрирована на **`Theme.AppCompat.DayNight.NoActionBar`** (обязательное условие
+  для работы `AppCompatDelegate.setApplicationLocales()` на API < 33).
+- В `AndroidManifest.xml` внутри `<application>` добавлен сервис
+  **`androidx.appcompat.app.AppLocalesMetadataHolderService`** с
+  `<meta-data android:name="autoStoreLocales" android:value="true"/>` —
+  автоматическое сохранение/восстановление локали на Android 12 и ниже.
+- Проверено: смена языка через `AppLanguage.apply()` работает на API 28–36
+  без перезапуска приложения.
 
 **Attachments**
 - **Изображения не отображались** (`AttachmentPreviewList`, `AttachmentImageLoader`) —
@@ -320,9 +372,18 @@
   очистка в `onCleared()` (файл + запись в БД удаляются через `GlobalScope`,
   т.к. `viewModelScope` уже отменён).
 
+**Tags / фильтрация**
+- **Точки-индикаторы в календаре** раньше рисовались только на выбранном дне,
+  хотя события были и на других. Теперь `datesWithEvents` вычисляется из
+  полного (или отфильтрованного) списка событий — точки видны на **всех**
+  днях с событиями.
+- **Пустой результат фильтра** больше не маскируется под «нет данных» —
+  показывается отдельное сообщение «Ничего не найдено».
+
 ### Planned
-- **Смена языка на Android < 13** — миграция `MainActivity` на `AppCompatActivity` и темы на `Theme.AppCompat.*`.
-- **Фильтрация списков по тегам** (Notes / Tasks / Calendar).
+- **Сохранение фильтра тегов** между перезапусками (`SavedStateHandle` / `DataStore`).
+- **AND-логика фильтра** (long-press на чипе) — продвинутый UX.
+- **Счётчик выбранных тегов** в `TopAppBar` (badge).
 - **Редактирование существующих тегов** (имя/цвет/эмодзи).
 - **Счётчик использования тега**.
 - **Поиск по эмодзи** в `EmojiPickerDialog`.
@@ -336,7 +397,7 @@
 - Резервное копирование.
 - Голосовые заметки.
 - Модуляризация (feature-модули).
-- Unit-тесты для Use Cases и Repository (в т.ч. `AttachmentRepository`).
+- Unit-тесты для Use Cases и Repository (в т.ч. `AttachmentRepository` и фильтрации в ViewModel).
 - WorkManager для напоминаний о задачах.
 - Настройка `room.schemaLocation` (Room Gradle plugin уже подключён).
 

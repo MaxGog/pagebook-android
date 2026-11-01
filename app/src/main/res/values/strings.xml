@@ -138,4 +138,7 @@
     <string name="task_deleted">Task deleted</string>
     <string name="event_added">Event added</string>
     <string name="event_deleted">Event deleted</string>
+
+    <string name="no_matching_items">Nothing found</string>
+    <string name="clear_filters">Clear</string>
 </resources>

@@ -16,6 +16,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.maxgog.pagebook.R
 import ru.maxgog.pagebook.ui.app.EmptyState
 import ru.maxgog.pagebook.ui.components.OverflowMenu
+import ru.maxgog.pagebook.ui.components.TagFilterRow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,14 +27,14 @@ fun NotesScreen(
     viewModel: NotesViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val allTags by viewModel.allTags.collectAsStateWithLifecycle()
+    val selectedTagIds by viewModel.selectedTagIds.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text(stringResource(R.string.notes)) },
-                actions = {
-                    OverflowMenu(onSettingsClick = onSettingsClick)
-                }
+                actions = { OverflowMenu(onSettingsClick = onSettingsClick) }
             )
         },
         floatingActionButton = {
@@ -44,33 +45,54 @@ fun NotesScreen(
             )
         }
     ) { innerPadding ->
-        when (val state = uiState) {
-            is NotesUiState.Loading -> Box(
-                Modifier.fillMaxSize().padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) { CircularProgressIndicator() }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            if (allTags.isNotEmpty()) {
+                TagFilterRow(
+                    allTags = allTags,
+                    selectedTagIds = selectedTagIds,
+                    onToggleTag = viewModel::toggleTagFilter,
+                    onClearFilters = viewModel::clearTagFilter,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
 
-            is NotesUiState.Error -> EmptyState(
-                text = state.message,
-                modifier = Modifier.padding(innerPadding)
-            )
+            Box(Modifier.weight(1f)) {
+                when (val state = uiState) {
+                    is NotesUiState.Loading -> Box(
+                        Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) { CircularProgressIndicator() }
 
-            is NotesUiState.Success -> {
-                if (state.notes.isEmpty()) {
-                    EmptyState(
-                        text = stringResource(R.string.no_notes),
-                        modifier = Modifier.padding(innerPadding)
+                    is NotesUiState.Error -> EmptyState(
+                        text = state.message,
+                        modifier = Modifier.fillMaxSize()
                     )
-                } else {
-                    LazyVerticalStaggeredGrid(
-                        columns = StaggeredGridCells.Adaptive(minSize = 160.dp),
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = innerPadding,
-                        verticalItemSpacing = 12.dp,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(state.notes, key = { it.id }) { note ->
-                            NoteItem(note = note, onClick = { onNoteClick(note.id) })
+
+                    is NotesUiState.Success -> {
+                        if (state.notes.isEmpty()) {
+                            EmptyState(
+                                text = if (selectedTagIds.isEmpty())
+                                    stringResource(R.string.no_notes)
+                                else
+                                    stringResource(R.string.no_matching_items),
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            LazyVerticalStaggeredGrid(
+                                columns = StaggeredGridCells.Adaptive(minSize = 160.dp),
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(horizontal = 12.dp),
+                                verticalItemSpacing = 12.dp,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                items(state.notes, key = { it.id }) { note ->
+                                    NoteItem(note = note, onClick = { onNoteClick(note.id) })
+                                }
+                            }
                         }
                     }
                 }

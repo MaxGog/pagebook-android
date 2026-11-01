@@ -20,10 +20,11 @@ PageBook Android следует официальным рекомендация�
 > **Статус миграции:** Clean Architecture полностью внедрена для всех трёх
 > модулей — **Notes**, **Tasks** и **Events (Calendar)**. Все три БД объединены
 > в одну `PageBookDatabase` (version 4). Добавлена сквозная система
-> **тегов с кастомизацией цвета и эмодзи**, **подсистема вложений**
-> (изображения + файлы, хранятся в app-private storage, скачиваются через
-> MediaStore), а также **глобальная система уведомлений** (кастомный `Snackbar`
-> с аватаром-фурсоной) и **пасхалка** в настройках. UI переведён на Material 3 Expressive,
+> **тегов с кастомизацией цвета и эмодзи** и **фильтрацией списков по тегам**
+> во всех трёх модулях, **подсистема вложений** (изображения + файлы,
+> хранятся в app-private storage, скачиваются через MediaStore),
+> **глобальная система уведомлений** (кастомный `Snackbar` с аватаром-фурсоной)
+> и **пасхалка** в настройках. UI переведён на Material 3 Expressive,
 > локализован на `ru`/`en`, добавлена адаптивность под планшеты.
 
 ## 🛠 Технологический стек
@@ -83,7 +84,8 @@ ru.maxgog.pagebook
     ├── notification/             # AppNotificationHost, FursonaSnackbar,
     │                             #   FursonaSnackbarVisuals
     ├── components/               # TagChip, CompactTagChip, CreateTagDialog,
-    │                             #   TagPickerDialog, EmojiCatalog, EmojiPickerDialog,
+    │                             #   TagPickerDialog, TagFilterRow,
+    │                             #   EmojiCatalog, EmojiPickerDialog,
     │                             #   OverflowMenu, AttachmentPreviewList,
     │                             #   AttachmentImageLoader, AttachmentPicker,
     │                             #   ResizeImageDialog
@@ -135,12 +137,58 @@ abstract class PageBookDatabase : RoomDatabase() {
 ## 🏷️ Система тегов
 
 Теги — **сквозная фича**, кастомизируются цветом (7 вариантов) и
-опциональным эмодзи (200+ в 10 категориях).
+опциональным эмодзи (200+ в 10 категориях). Работают на заметках, задачах
+и событиях одновременно через many-to-many (`@Junction`).
 
 ### Особенности
 - **`emoji: String?`** — опционально. Без эмодзи рисуется цветная точка, с эмодзи — символ в `leadingIcon`.
 - **`_pendingTags` / `selectedTags`** — ViewModel накапливает выбранные теги для новых (ещё не сохранённых) сущностей, привязка происходит после `save*`.
 - **`EmojiCatalog`** — статический объект (`@StringRes` для категорий), не требует сети.
+
+### 🔍 Фильтрация списков по тегам
+
+Единый паттерн во всех трёх модулях (**Notes**, **Tasks**, **Calendar**):
+
+1. **`TagFilterRow`** (`ui/components/`) — горизонтальный `LazyRow` из
+   `FilterChip` (переиспользует `TagChip`). В конце ряда появляется
+   `AssistChip` «Сбросить», если есть выбранные теги. Компонент не рендерится,
+   если `allTags` пуст.
+2. **ViewModel** хранит `_selectedTagIds: MutableStateFlow<Set<Int>>`
+   и `allTags: StateFlow<List<Tag>>` (из `GetAllTagsUseCase`).
+   В `combine(getAll*(), _selectedTagIds)` применяется фильтрация.
+3. **OR-логика**: сущность проходит фильтр, если у неё есть **хотя бы один**
+   из выбранных тегов. Пустой `Set` — фильтр выключен.
+4. **Календарь дополнительно**: `CalendarUiState.datesWithEvents: Set<LocalDate>`
+   вычисляется из **отфильтрованного** списка событий → точки-индикаторы
+   на днях автоматически сужаются под фильтр. Заодно это исправило баг —
+   раньше точка рисовалась только на выбранном дне.
+5. **Пустой результат** при активном фильтре → `EmptyState` с
+   `R.string.no_matching_items` («Ничего не найдено») вместо
+   «Нет заметок / задач / событий».
+
+```kotlin
+// Паттерн (NotesViewModel / TaskListViewModel / CalendarViewModel)
+private val _selectedTagIds = MutableStateFlow<Set<Int>>(emptySet())
+val selectedTagIds: StateFlow<Set<Int>> = _selectedTagIds.asStateFlow()
+
+val uiState = combine(getAllItems(), _selectedTagIds) { items, tagIds ->
+    val filtered = if (tagIds.isEmpty()) items
+                   else items.filter { it.tags.any { t -> t.id in tagIds } }
+    UiState.Success(filtered)
+}
+
+fun toggleTagFilter(tagId: Int) =
+    _selectedTagIds.update { if (tagId in it) it - tagId else it + tagId }
+
+fun clearTagFilter() { _selectedTagIds.value = emptySet() }
+```
+
+> **Почему фильтрация в ViewModel, а не SQL-запросом:** список уже
+> загружается реактивно из Room вместе с `@Relation tags` — фильтрация
+> в памяти бесплатна и не требует новых DAO-запросов. При росте объёма
+> данных до десятков тысяч записей имеет смысл перейти на
+> `SELECT ... WHERE id IN (SELECT noteId FROM note_tag_cross_ref WHERE tagId IN (...))`
+> с `Flow`-подпиской на параметр.
 
 ## 📎 Подсистема вложений (Attachments)
 
@@ -299,25 +347,53 @@ sequenceDiagram
     Note over DB: UPDATE, а не INSERT (иначе SQLiteConstraintException)
 ```
 
+### Фильтрация списка по тегу
+```mermaid
+sequenceDiagram
+    participant UI as NotesScreen
+    participant Row as TagFilterRow
+    participant VM as NotesViewModel
+    participant Repo as NoteRepository (Room Flow)
+    participant State as NotesUiState
+
+    Note over VM: _selectedTagIds = emptySet()
+    Repo-->>VM: List<Note> (Flow из Room с @Relation tags)
+    VM->>State: Success(allNotes)
+    UI->>Row: рендер с allTags
+    UI->>Row: tap по чипу "🎯 Цели"
+    Row->>VM: toggleTagFilter(tagId = 7)
+    VM->>VM: _selectedTagIds += 7
+    Note over VM: combine → пересчёт
+    VM->>VM: notes.filter { note.tags.any { it.id in {7} } }
+    VM->>State: Success(filteredNotes)
+    State-->>UI: рекомпозиция LazyVerticalStaggeredGrid
+    UI->>Row: tap по чипу "Сбросить"
+    Row->>VM: clearTagFilter()
+    VM->>VM: _selectedTagIds = emptySet()
+    VM->>State: Success(allNotes) — фильтр снят
+```
+
 ## 🧭 Ключевые архитектурные решения
 
-| Решение                                                                      | Обоснование                                                                |
-|:-----------------------------------------------------------------------------|:---------------------------------------------------------------------------|
-| **Clean Architecture**                                                       | UI не зависит от схемы БД; Use Cases инкапсулируют бизнес-логику.          |
-| **Repository как интерфейс**                                                 | Позволяет подменить источник данных без изменения Domain/UI.               |
-| **UI State (sealed / data class)**                                           | Явные состояния `Loading`/`Success`/`Error` — предсказуемое поведение.     |
-| **One-Shot Events (`Channel`)**                                              | Гарантирует однократный вызов `onBack()` после сохранения.                 |
+| Решение                                                                      | Обоснование                                                                                                   |
+|:-----------------------------------------------------------------------------|:--------------------------------------------------------------------------------------------------------------|
+| **Clean Architecture**                                                       | UI не зависит от схемы БД; Use Cases инкапсулируют бизнес-логику.                                             |
+| **Repository как интерфейс**                                                 | Позволяет подменить источник данных без изменения Domain/UI.                                                  |
+| **UI State (sealed / data class)**                                           | Явные состояния `Loading`/`Success`/`Error` — предсказуемое поведение.                                        |
+| **One-Shot Events (`Channel`)**                                              | Гарантирует однократный вызов `onBack()` после сохранения.                                                    |
 | **Глобальный `SnackbarHost` + `Channel`**                                    | Избавляет ViewModel от `Context`, гарантирует доставку, убирает дублирование `SnackbarHost` на каждом экране. |
-| **Hilt**                                                                     | Масштабируемый DI, генерируемый на этапе компиляции.                       |
-| **Type-safe navigation**                                                     | Компилятор проверяет маршруты и аргументы.                                 |
-| **`AppCompatDelegate` для языка**                                            | Единый источник правды, работающий на всех версиях Android.                |
-| **Полиморфные вложения (`ownerType` + `ownerId`)**                           | Одна таблица и один UI-компонент для Notes и Tasks.                        |
-| **`localPath` — относительный путь**                                         | Отвязка от абсолютного `filesDir` (меняется между установками/бэкапами).   |
-| **`@Update` для pending-вложений**                                           | Избегаем `SQLiteConstraintException` при повторном `insert` с тем же `id`. |
-| **Адаптивные лейауты (`NavigationSuiteScaffold`, `ListDetailPaneScaffold`)** | Соответствие гайдлайнам Google для телефонов, планшетов и Chromebook.      |
-| **M3 Expressive (`Card`, `ListItem`)**                                       | Современный вид без alpha-зависимостей.                                    |
-| **`@StringRes` в ViewModel**                                                 | Snackbar-сообщения локализуются без утечек `Context`.                      |
-| **Кастомный `Snackbar` с фурсоной**                                          | Единый стиль уведомлений, брендинг, M3 Expressive (`Surface` + `Box` для выхода за рамки). |
+| **Hilt**                                                                     | Масштабируемый DI, генерируемый на этапе компиляции.                                                          |
+| **Type-safe navigation**                                                     | Компилятор проверяет маршруты и аргументы.                                                                    |
+| **`AppCompatDelegate` для языка**                                            | Единый источник правды, работающий на всех версиях Android.                                                   |
+| **Полиморфные вложения (`ownerType` + `ownerId`)**                           | Одна таблица и один UI-компонент для Notes и Tasks.                                                           |
+| **`localPath` — относительный путь**                                         | Отвязка от абсолютного `filesDir` (меняется между установками/бэкапами).                                      |
+| **`@Update` для pending-вложений**                                           | Избегаем `SQLiteConstraintException` при повторном `insert` с тем же `id`.                                    |
+| **Фильтрация тегов в ViewModel (OR-логика)**                                 | Реактивный `combine` без новых DAO-запросов; фильтр — часть UI-состояния, а не бизнес-логики.                 |
+| **`datesWithEvents` из отфильтрованного списка**                             | Точки-индикаторы в календаре автоматически сужаются под фильтр, без дублирования логики.                      |
+| **Адаптивные лейауты (`NavigationSuiteScaffold`, `ListDetailPaneScaffold`)** | Соответствие гайдлайнам Google для телефонов, планшетов и Chromebook.                                         |
+| **M3 Expressive (`Card`, `ListItem`)**                                       | Современный вид без alpha-зависимостей.                                                                       |
+| **`@StringRes` в ViewModel**                                                 | Snackbar-сообщения локализуются без утечек `Context`.                                                         |
+| **Кастомный `Snackbar` с фурсоной**                                          | Единый стиль уведомлений, брендинг, M3 Expressive (`Surface` + `Box` для выхода за рамки).                    |
 
 ## 🚀 Планы по развитию
 
@@ -326,6 +402,7 @@ sequenceDiagram
 - [x] Подключить **ML Kit** для извлечения дат.
 - [x] Объединить три БД в `PageBookDatabase`.
 - [x] Добавить **сквозную систему тегов** (7 цветов, many-to-many, эмодзи).
+- [x] Добавить **фильтрацию списков по тегам** (Notes / Tasks / Calendar) — OR-логика через `_selectedTagIds` в ViewModel, компонент `TagFilterRow`, кнопка «Сбросить», `datesWithEvents` в календаре.
 - [x] Реализовать **адаптивный UI** (BottomBar/Rail, два пена на планшетах).
 - [x] Перевести UI на **Material 3 Expressive** + локализация (`ru`/`en`).
 - [x] Починить смену языка через **`AppCompatDelegate`**.
@@ -333,13 +410,15 @@ sequenceDiagram
 - [x] Добавить **подсистему вложений** (изображения + файлы, общая для Notes и Tasks).
 - [x] Внедрить **глобальную систему уведомлений** с фурсоной (`AppNotificationManager` + `FursonaSnackbar`).
 - [x] Добавить **пасхалку** и аватар разработчика в настройки.
-- [ ] Фильтрация списков по тегам (Notes / Tasks / Calendar).
+- [ ] **Сохранение фильтра** между перезапусками (`SavedStateHandle` / `DataStore`).
+- [ ] **AND-логика фильтра** (long-press на чипе) — продвинутый UX.
+- [ ] **Счётчик выбранных тегов** в `TopAppBar` (badge).
 - [ ] Редактирование существующих тегов (имя/цвет/эмодзи) в UI.
 - [ ] Поиск по эмодзи в `EmojiPickerDialog`.
 - [ ] Просмотр вложений на весь экран (fullscreen viewer).
 - [ ] Камера как источник изображения (сейчас только галерея).
 - [ ] Модуляризация (feature-модули).
-- [ ] Unit-тесты для Use Cases и Repository (включая `AttachmentRepository`).
+- [ ] Unit-тесты для Use Cases и Repository (включая `AttachmentRepository` и фильтрацию в ViewModel).
 
 ## 📚 Полезные ссылки
 - [Guide to App Architecture (Google)](https://developer.android.com/topic/architecture)
@@ -353,3 +432,4 @@ sequenceDiagram
 - [Hilt — `@Binds`](https://developer.android.com/training/dependency-injection/hilt-android#hilt-modules)
 - [MediaStore — Download files](https://developer.android.com/training/data-storage/shared/media)
 - [Photo picker](https://developer.android.com/training/data-storage/shared/photopicker)
+- [Compose — FilterChip](https://developer.android.com/develop/ui/compose/components/chip#filter-chip)

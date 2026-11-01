@@ -40,6 +40,9 @@ class CalendarViewModel @Inject constructor(
     private val notificationManager: AppNotificationManager
 ) : ViewModel() {
 
+    private val _selectedTagIds = MutableStateFlow<Set<Int>>(emptySet())
+    val selectedTagIds: StateFlow<Set<Int>> = _selectedTagIds.asStateFlow()
+
     private val _selectedDate = MutableStateFlow(
         Clock.System.todayIn(TimeZone.currentSystemDefault())
     )
@@ -52,12 +55,20 @@ class CalendarViewModel @Inject constructor(
     val pendingTags: StateFlow<List<Tag>> = _pendingTags.asStateFlow()
 
     val uiState: StateFlow<CalendarUiState> =
-        combine(getAllEvents(), _selectedDate, _showDialog) { events, date, show ->
+        combine(
+            getAllEvents(),
+            _selectedDate,
+            _showDialog,
+            _selectedTagIds
+        ) { events, date, show, tagIds ->
+            val filtered = if (tagIds.isEmpty()) events
+            else events.filter { e -> e.tags.any { it.id in tagIds } }
             CalendarUiState(
                 isLoading = false,
                 selectedDate = date,
-                eventsForSelectedDate = events.filter { it.date == date },
-                showAddDialog = show
+                eventsForSelectedDate = filtered.filter { it.date == date },
+                showAddDialog = show,
+                datesWithEvents = filtered.map { it.date }.toSet() as Set<LocalDate>
             )
         }
             .catch { emit(CalendarUiState(error = it.message ?: "Unknown error")) }
@@ -66,6 +77,12 @@ class CalendarViewModel @Inject constructor(
                 started = SharingStarted.WhileSubscribed(5_000),
                 initialValue = CalendarUiState()
             )
+
+    fun toggleTagFilter(tagId: Int) {
+        _selectedTagIds.update { ids -> if (tagId in ids) ids - tagId else ids + tagId }
+    }
+
+    fun clearTagFilter() { _selectedTagIds.value = emptySet() }
 
     fun onDateSelected(date: LocalDate) { _selectedDate.value = date }
     fun showAddDialog() { _showDialog.value = true }
