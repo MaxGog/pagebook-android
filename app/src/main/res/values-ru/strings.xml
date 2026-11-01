@@ -150,4 +150,13 @@
     <!-- Tag editing -->
     <string name="edit_tag">Редактировать тег</string>
     <string name="tag_usage_format">Заметок: %1$d · Задач: %2$d · Событий: %3$d</string>
+    <string name="delete_note_confirm">Удалить заметку «%1$s»? Это действие нельзя отменить.</string>
+    <string name="delete_task_confirm">Удалить задачу «%1$s»? Это действие нельзя отменить.</string>
+    <string name="mark_completed">Отметить выполненной</string>
+    <string name="mark_uncompleted">Отметить невыполненной</string>
+    <string name="edit_event">Редактировать событие</string>
+    <string name="event_updated">Событие обновлено</string>
+    <string name="delete_event_confirm">Удалить событие «%1$s»? Это действие нельзя отменить.</string>
+    <string name="title_required">Введите название</string>
+    <string name="invalid_time">Неверный формат времени</string>
 </resources>

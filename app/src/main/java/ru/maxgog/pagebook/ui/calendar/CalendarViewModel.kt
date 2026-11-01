@@ -37,7 +37,7 @@ import javax.inject.Inject
 @HiltViewModel
 class CalendarViewModel @Inject constructor(
     getAllEvents: GetAllEventsUseCase,
-    private val saveEvent: SaveEventUseCase,
+    private val saveEventUseCase: SaveEventUseCase,
     private val deleteEventUseCase: DeleteEventUseCase,
     getAllTags: GetAllTagsUseCase,
     private val createTag: CreateTagUseCase,
@@ -51,6 +51,7 @@ class CalendarViewModel @Inject constructor(
     )
     private val _showDialog = MutableStateFlow(false)
     private val _pendingTags = MutableStateFlow<List<Tag>>(emptyList())
+    private val _editingEvent = MutableStateFlow<Event?>(null)
 
     val allTags: StateFlow<List<Tag>> = getAllTags()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -65,25 +66,46 @@ class CalendarViewModel @Inject constructor(
         getAllEvents(),
         _selectedDate,
         _showDialog,
-        filterState
-    ) { events, date, show, filter ->
+        filterState,
+        _editingEvent
+    ) { values ->
+        @Suppress("UNCHECKED_CAST")
+        val events = values[0] as List<Event>
+        val date = values[1] as LocalDate
+        val show = values[2] as Boolean
+        val filter = values[3] as TagFilterState
+        val editing = values[4] as Event?
+
         val filtered = events.applyTagFilter(filter) { it.tags }
         CalendarUiState(
             isLoading = false,
             selectedDate = date,
             eventsForSelectedDate = filtered.filter { it.date == date },
             showAddDialog = show,
-            datesWithEvents = filtered.map { it.date }.toSet() as Set<LocalDate>
+            datesWithEvents = filtered.mapTo(mutableSetOf()) { it.date } as Set<LocalDate>,
+            editingEvent = editing
         )
     }
         .catch { emit(CalendarUiState(error = it.message ?: "Unknown error")) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CalendarUiState())
 
     fun onDateSelected(date: LocalDate) { _selectedDate.value = date }
-    fun showAddDialog() { _showDialog.value = true }
+
+    fun showAddDialog() {
+        _editingEvent.value = null
+        _pendingTags.value = emptyList()
+        _showDialog.value = true
+    }
+
+    fun startEdit(event: Event) {
+        _editingEvent.value = event
+        _pendingTags.value = emptyList()
+        _showDialog.value = true
+    }
 
     fun hideAddDialog() {
         _showDialog.value = false
+        _editingEvent.value = null
         _pendingTags.value = emptyList()
     }
 
@@ -106,18 +128,33 @@ class CalendarViewModel @Inject constructor(
         }
     }
 
-    fun addEvent(title: String, description: String, date: LocalDate, time: String) {
+    /** Создаёт новое или обновляет существующее событие. */
+    fun saveEvent(title: String, description: String, date: LocalDate, time: String) {
         viewModelScope.launch {
             try {
-                val eventId = saveEvent(
-                    Event(title = title, description = description, date = date, time = time)
-                )
-                _pendingTags.value.forEach { tag ->
-                    tagRepository.addTagToEvent(eventId.toInt(), tag.id)
+                val editing = _editingEvent.value
+                if (editing != null) {
+                    saveEventUseCase(
+                        editing.copy(
+                            title = title,
+                            description = description,
+                            date = date,
+                            time = time
+                        )
+                    )
+                    notificationManager.success(R.string.event_updated)
+                } else {
+                    val eventId = saveEventUseCase(
+                        Event(title = title, description = description, date = date, time = time)
+                    )
+                    _pendingTags.value.forEach { tag ->
+                        tagRepository.addTagToEvent(eventId.toInt(), tag.id)
+                    }
+                    notificationManager.success(R.string.event_added)
                 }
                 _showDialog.value = false
+                _editingEvent.value = null
                 _pendingTags.value = emptyList()
-                notificationManager.success(R.string.event_added)
             } catch (e: Exception) {
                 notificationManager.error(R.string.unknown_error)
             }

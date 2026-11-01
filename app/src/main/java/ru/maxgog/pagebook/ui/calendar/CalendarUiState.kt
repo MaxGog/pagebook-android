@@ -12,5 +12,6 @@ data class CalendarUiState(
     val eventsForSelectedDate: List<Event> = emptyList(),
     val showAddDialog: Boolean = false,
     val error: String? = null,
-    val datesWithEvents: Set<LocalDate> = emptySet()
+    val datesWithEvents: Set<LocalDate> = emptySet(),
+    val editingEvent: Event? = null
 )

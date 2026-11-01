@@ -9,12 +9,15 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import ru.maxgog.pagebook.R
+import ru.maxgog.pagebook.core.notification.AppNotificationManager
 import ru.maxgog.pagebook.domain.model.FilterMode
 import ru.maxgog.pagebook.domain.model.Note
 import ru.maxgog.pagebook.domain.model.Tag
 import ru.maxgog.pagebook.domain.model.TagFilterModule
 import ru.maxgog.pagebook.domain.model.TagFilterState
 import ru.maxgog.pagebook.domain.repository.TagFilterRepository
+import ru.maxgog.pagebook.domain.usecase.note.DeleteNoteUseCase
 import ru.maxgog.pagebook.domain.usecase.note.GetAllNotesUseCase
 import ru.maxgog.pagebook.domain.usecase.tag.GetAllTagsUseCase
 import ru.maxgog.pagebook.domain.util.applyTagFilter
@@ -24,7 +27,9 @@ import javax.inject.Inject
 class NotesViewModel @Inject constructor(
     getAllNotesUseCase: GetAllNotesUseCase,
     getAllTags: GetAllTagsUseCase,
-    private val tagFilterRepository: TagFilterRepository
+    private val tagFilterRepository: TagFilterRepository,
+    private val deleteNote: DeleteNoteUseCase,
+    private val notificationManager: AppNotificationManager
 ) : ViewModel() {
 
     val allTags: StateFlow<List<Tag>> = getAllTags()
@@ -57,5 +62,14 @@ class NotesViewModel @Inject constructor(
 
     fun clearTagFilter() = viewModelScope.launch {
         tagFilterRepository.clearFilter(TagFilterModule.NOTES)
+    }
+
+    fun delete(note: Note) = viewModelScope.launch {
+        try {
+            deleteNote(note)
+            notificationManager.success(R.string.note_deleted)
+        } catch (e: Exception) {
+            notificationManager.error(R.string.unknown_error)
+        }
     }
 }

@@ -1,6 +1,7 @@
 package ru.maxgog.pagebook.ui.notes
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -45,15 +46,12 @@ fun NoteEditScreen(
     val taskCreating by viewModel.taskCreating.collectAsStateWithLifecycle()
     val richTextState = rememberRichTextState()
 
-    val context = LocalContext.current
-
-    val pickImage = rememberPhotoPicker { uri ->
-        viewModel.attachUri(uri)
-    }
+    val pickImage = rememberPhotoPicker { uri -> viewModel.attachUri(uri) }
     val pickFile = rememberFilePicker { uri -> viewModel.attachUri(uri) }
 
     var showTagPicker by remember { mutableStateOf(false) }
     var showCreateTag by remember { mutableStateOf(false) }
+    var showMoreMenu by remember { mutableStateOf(false) }
 
     val currentNote = (uiState as? NoteEditUiState.Editing)?.note
     val currentTags = when (val s = uiState) {
@@ -95,7 +93,9 @@ fun NoteEditScreen(
                     title = {
                         Text(
                             text = if (isNewNote) stringResource(R.string.new_note)
-                            else stringResource(R.string.edit_note)
+                            else stringResource(R.string.edit_note),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold
                         )
                     },
                     navigationIcon = {
@@ -107,28 +107,7 @@ fun NoteEditScreen(
                         }
                     },
                     actions = {
-                        // 🆕 Медиа
-                        IconButton(onClick = { pickImage() }) {
-                            Icon(Icons.Default.AddPhotoAlternate, contentDescription = stringResource(R.string.add_photo))
-                        }
-                        IconButton(onClick = { pickFile() }) {
-                            Icon(Icons.Default.AttachFile, contentDescription = stringResource(R.string.attach_file))
-                        }
-                        if (currentNote != null) {
-                            IconButton(
-                                onClick = { viewModel.createTaskFromCurrentNote() },
-                                enabled = canCreateTask
-                            ) {
-                                if (taskCreating) {
-                                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                                } else {
-                                    Icon(Icons.Default.AddTask, contentDescription = stringResource(R.string.create_task))
-                                }
-                            }
-                        }
-                        IconButton(onClick = { showTagPicker = true }) {
-                            Icon(Icons.Default.Label, contentDescription = stringResource(R.string.tags))
-                        }
+                        // 1) Save — primary
                         IconButton(
                             onClick = { viewModel.save(titleState, richTextState.toHtml()) },
                             enabled = saveEnabled
@@ -140,18 +119,91 @@ fun NoteEditScreen(
                                 else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                             )
                         }
-                        if (currentNote != null) {
-                            IconButton(onClick = { viewModel.delete() }) {
+
+                        // 2) Tags с badge
+                        IconButton(onClick = { showTagPicker = true }) {
+                            BadgedBox(
+                                badge = {
+                                    if (currentTags.isNotEmpty()) {
+                                        Badge { Text(currentTags.size.toString()) }
+                                    }
+                                }
+                            ) {
                                 Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = stringResource(R.string.delete),
-                                    tint = MaterialTheme.colorScheme.error
+                                    imageVector = Icons.Default.Label,
+                                    contentDescription = stringResource(R.string.tags)
                                 )
+                            }
+                        }
+
+                        // 3) Overflow — фото, файл, задача, удаление
+                        Box {
+                            IconButton(onClick = { showMoreMenu = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = stringResource(R.string.more_options)
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showMoreMenu,
+                                onDismissRequest = { showMoreMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.add_photo)) },
+                                    onClick = { showMoreMenu = false; pickImage() },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.AddPhotoAlternate, contentDescription = null)
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.attach_file)) },
+                                    onClick = { showMoreMenu = false; pickFile() },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.AttachFile, contentDescription = null)
+                                    }
+                                )
+                                if (currentNote != null) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.create_task)) },
+                                        onClick = {
+                                            showMoreMenu = false
+                                            viewModel.createTaskFromCurrentNote()
+                                        },
+                                        enabled = canCreateTask,
+                                        leadingIcon = {
+                                            if (taskCreating) {
+                                                CircularProgressIndicator(
+                                                    Modifier.size(20.dp),
+                                                    strokeWidth = 2.dp
+                                                )
+                                            } else {
+                                                Icon(Icons.Default.AddTask, contentDescription = null)
+                                            }
+                                        }
+                                    )
+                                    HorizontalDivider()
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = stringResource(R.string.delete),
+                                                color = MaterialTheme.colorScheme.error
+                                            )
+                                        },
+                                        onClick = { showMoreMenu = false; viewModel.delete() },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.Delete,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.error
+                                            )
+                                        }
+                                    )
+                                }
                             }
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                        containerColor = MaterialTheme.colorScheme.surface,
                         titleContentColor = MaterialTheme.colorScheme.onSurface
                     )
                 )
@@ -160,17 +212,24 @@ fun NoteEditScreen(
             contentWindowInsets = WindowInsets(0)
         ) { padding ->
             when {
-                isLoading -> Box(Modifier.fillMaxSize().padding(padding), Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+                isLoading -> Box(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    Alignment.Center
+                ) { CircularProgressIndicator() }
 
                 uiState is NoteEditUiState.Error -> Box(
-                    Modifier.fillMaxSize().padding(padding).padding(24.dp),
+                    Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .padding(24.dp),
                     Alignment.Center
                 ) {
                     Text(
-                        (uiState as NoteEditUiState.Error).message,
-                        color = MaterialTheme.colorScheme.error
+                        text = (uiState as NoteEditUiState.Error).message,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyLarge
                     )
                 }
 
@@ -184,16 +243,20 @@ fun NoteEditScreen(
                         value = titleState,
                         onValueChange = { titleState = it },
                         textStyle = MaterialTheme.typography.headlineSmall.copy(
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.SemiBold
                         ),
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp, bottom = 8.dp),
                         decorationBox = { inner ->
                             Box {
                                 if (titleState.isEmpty()) {
                                     Text(
-                                        stringResource(R.string.title),
+                                        text = stringResource(R.string.title),
                                         style = MaterialTheme.typography.headlineSmall,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                                     )
                                 }
@@ -202,16 +265,32 @@ fun NoteEditScreen(
                         }
                     )
 
-                    if (currentTags.isNotEmpty()) {
-                        FlowRow(
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            currentTags.forEach { tag ->
-                                TagChip(tag = tag, selected = true, onDelete = { viewModel.toggleTag(tag) })
-                            }
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+
+                    // Теги + inline-кнопка «Добавить»
+                    FlowRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        currentTags.forEach { tag ->
+                            TagChip(
+                                tag = tag,
+                                selected = true,
+                                onDelete = { viewModel.toggleTag(tag) }
+                            )
                         }
+                        AssistChip(
+                            onClick = { showTagPicker = true },
+                            label = { Text(stringResource(R.string.tags)) },
+                            leadingIcon = {
+                                Icon(Icons.Default.Add, contentDescription = null)
+                            }
+                        )
                     }
 
                     if (currentAttachments.isNotEmpty()) {
@@ -225,8 +304,15 @@ fun NoteEditScreen(
 
                     RichTextEditor(
                         state = richTextState,
-                        modifier = Modifier.fillMaxWidth().weight(1f),
-                        placeholder = { Text(stringResource(R.string.content)) }
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        placeholder = {
+                            Text(
+                                text = stringResource(R.string.content),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        }
                     )
                 }
             }
@@ -262,7 +348,8 @@ fun FormattingToolbar(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 3.dp
+        tonalElevation = 3.dp,
+        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
     ) {
         Row(
             modifier = Modifier
@@ -271,28 +358,63 @@ fun FormattingToolbar(
                     WindowInsets.navigationBars.union(WindowInsets.ime)
                 )
                 .padding(horizontal = 8.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            IconToggleButton(
+            ToolbarToggleButton(
+                icon = Icons.Default.FormatBold,
                 checked = currentStyle.fontWeight == FontWeight.Bold,
-                onCheckedChange = { state.toggleSpanStyle(SpanStyle(fontWeight = FontWeight.Bold)) }
-            ) { Icon(Icons.Default.FormatBold, contentDescription = null) }
-
-            IconToggleButton(
+                onClick = {
+                    state.toggleSpanStyle(SpanStyle(fontWeight = FontWeight.Bold))
+                }
+            )
+            ToolbarToggleButton(
+                icon = Icons.Default.FormatItalic,
                 checked = currentStyle.fontStyle == FontStyle.Italic,
-                onCheckedChange = { state.toggleSpanStyle(SpanStyle(fontStyle = FontStyle.Italic)) }
-            ) { Icon(Icons.Default.FormatItalic, contentDescription = null) }
-
-            IconToggleButton(
+                onClick = {
+                    state.toggleSpanStyle(SpanStyle(fontStyle = FontStyle.Italic))
+                }
+            )
+            ToolbarToggleButton(
+                icon = Icons.Default.FormatUnderlined,
                 checked = currentStyle.textDecoration == TextDecoration.Underline,
-                onCheckedChange = {
+                onClick = {
                     state.toggleSpanStyle(SpanStyle(textDecoration = TextDecoration.Underline))
                 }
-            ) { Icon(Icons.Default.FormatUnderlined, contentDescription = null) }
-
-            IconButton(onClick = { state.toggleSpanStyle(SpanStyle(fontSize = 24.sp)) }) {
-                Icon(Icons.Default.FormatSize, contentDescription = null)
-            }
+            )
+            ToolbarToggleButton(
+                icon = Icons.Default.FormatStrikethrough,
+                checked = currentStyle.textDecoration == TextDecoration.LineThrough,
+                onClick = {
+                    state.toggleSpanStyle(SpanStyle(textDecoration = TextDecoration.LineThrough))
+                }
+            )
+            ToolbarToggleButton(
+                icon = Icons.Default.FormatSize,
+                checked = currentStyle.fontSize == 24.sp,
+                onClick = {
+                    state.toggleSpanStyle(SpanStyle(fontSize = 24.sp))
+                }
+            )
         }
+    }
+}
+
+@Composable
+private fun ToolbarToggleButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    checked: Boolean,
+    onClick: () -> Unit
+) {
+    IconToggleButton(
+        checked = checked,
+        onCheckedChange = { onClick() }
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (checked) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

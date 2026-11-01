@@ -150,4 +150,13 @@
     <!-- Tag editing -->
     <string name="edit_tag">Edit tag</string>
     <string name="tag_usage_format">Notes: %1$d · Tasks: %2$d · Events: %3$d</string>
+    <string name="delete_note_confirm">Delete note "%1$s"? This action cannot be undone.</string>
+    <string name="delete_task_confirm">Delete task "%1$s"? This action cannot be undone.</string>
+    <string name="mark_completed">Mark as completed</string>
+    <string name="mark_uncompleted">Mark as uncompleted</string>
+    <string name="edit_event">Edit event</string>
+    <string name="event_updated">Event updated</string>
+    <string name="delete_event_confirm">Delete event "%1$s"? This action cannot be undone.</string>
+    <string name="title_required">Title is required</string>
+    <string name="invalid_time">Invalid time format</string>
 </resources>

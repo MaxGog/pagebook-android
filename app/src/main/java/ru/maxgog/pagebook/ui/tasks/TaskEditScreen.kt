@@ -1,22 +1,27 @@
 package ru.maxgog.pagebook.ui.tasks
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.AddTask
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Label
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -32,7 +37,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun TaskEditScreen(
     onBack: () -> Unit,
@@ -45,6 +50,7 @@ fun TaskEditScreen(
     var showTagPicker by remember { mutableStateOf(false) }
     var showCreateTag by remember { mutableStateOf(false) }
     var showDateTimePicker by remember { mutableStateOf(false) }
+    var showMoreMenu by remember { mutableStateOf(false) }
 
     val currentTask = (uiState as? TaskEditUiState.Editing)?.task
     val currentTags = when (val s = uiState) {
@@ -87,48 +93,125 @@ fun TaskEditScreen(
             TopAppBar(
                 title = {
                     Text(
-                        stringResource(if (isNewTask) R.string.new_task else R.string.edit_task)
+                        text = stringResource(if (isNewTask) R.string.new_task else R.string.edit_task),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.back)
+                        )
                     }
                 },
                 actions = {
-                    IconButton(onClick = { pickImage() }) {
-                        Icon(Icons.Default.AddPhotoAlternate, contentDescription = stringResource(R.string.add_photo))
-                    }
-                    IconButton(onClick = { pickFile() }) {
-                        Icon(Icons.Default.AttachFile, contentDescription = stringResource(R.string.attach_file))
-                    }
-                    IconButton(onClick = { showTagPicker = true }) {
-                        Icon(Icons.Default.Label, contentDescription = stringResource(R.string.tags))
-                    }
                     FilledTonalIconButton(
                         onClick = { viewModel.save(title, description, reminderTime) },
                         enabled = saveEnabled
                     ) {
-                        Icon(Icons.Default.Check, contentDescription = stringResource(R.string.save))
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = stringResource(R.string.save)
+                        )
                     }
-                    if (currentTask != null) {
-                        IconButton(onClick = { viewModel.delete() }) {
-                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete))
+
+                    IconButton(onClick = { showTagPicker = true }) {
+                        BadgedBox(
+                            badge = {
+                                if (currentTags.isNotEmpty()) {
+                                    Badge { Text(currentTags.size.toString()) }
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Label,
+                                contentDescription = stringResource(R.string.tags)
+                            )
                         }
                     }
-                }
+
+                    Box {
+                        IconButton(onClick = { showMoreMenu = true }) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = stringResource(R.string.more_options)
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = showMoreMenu,
+                            onDismissRequest = { showMoreMenu = false },
+                            shape = MaterialTheme.shapes.large
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.add_photo)) },
+                                onClick = { showMoreMenu = false; pickImage() },
+                                leadingIcon = {
+                                    Icon(Icons.Default.AddPhotoAlternate, contentDescription = null)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.attach_file)) },
+                                onClick = { showMoreMenu = false; pickFile() },
+                                leadingIcon = {
+                                    Icon(Icons.Default.AttachFile, contentDescription = null)
+                                }
+                            )
+                            if (currentTask != null) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(vertical = 4.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant
+                                )
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = stringResource(R.string.delete),
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    },
+                                    onClick = { showMoreMenu = false; viewModel.delete() },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                )
+                            }
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                )
             )
+
         }
     ) { padding ->
         when {
-            isLoading -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
+            isLoading -> Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) { CircularProgressIndicator() }
 
             uiState is TaskEditUiState.Error -> Box(
-                Modifier.fillMaxSize().padding(padding).padding(24.dp),
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(24.dp),
                 contentAlignment = Alignment.Center
-            ) { Text((uiState as TaskEditUiState.Error).message) }
+            ) {
+                Text(
+                    text = (uiState as TaskEditUiState.Error).message,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
 
             else -> Column(
                 modifier = Modifier
@@ -146,14 +229,18 @@ fun TaskEditScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.large
                 )
+
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
                     label = { Text(stringResource(R.string.task_description)) },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 120.dp),
                     maxLines = 6,
                     shape = MaterialTheme.shapes.large
                 )
+
                 if (currentAttachments.isNotEmpty()) {
                     AttachmentPreviewList(
                         attachments = currentAttachments,
@@ -161,17 +248,29 @@ fun TaskEditScreen(
                         onDownload = viewModel::downloadAttachment
                     )
                 }
-                if (currentTags.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        currentTags.forEach { tag ->
-                            TagChip(tag = tag, selected = true, onDelete = { viewModel.toggleTag(tag) })
-                        }
+                
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    currentTags.forEach { tag ->
+                        TagChip(
+                            tag = tag,
+                            selected = true,
+                            onDelete = { viewModel.toggleTag(tag) }
+                        )
                     }
+                    AssistChip(
+                        onClick = { showTagPicker = true },
+                        label = { Text(stringResource(R.string.tags)) },
+                        leadingIcon = {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                        }
+                    )
                 }
 
+                // Reminder card
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.large,
@@ -180,16 +279,27 @@ fun TaskEditScreen(
                     )
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Notifications, null, tint = MaterialTheme.colorScheme.primary)
+                        Icon(
+                            imageVector = Icons.Default.Notifications,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(stringResource(R.string.reminder), style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                text = stringResource(R.string.reminder),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
                             Text(
                                 text = reminderTime?.let {
-                                    SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(it))
+                                    SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
+                                        .format(Date(it))
                                 } ?: stringResource(R.string.reminder_not_set),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -208,8 +318,10 @@ fun TaskEditScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.large
                 ) {
+                    Icon(Icons.Default.Notifications, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
                     Text(
-                        stringResource(
+                        text = stringResource(
                             if (reminderTime == null) R.string.set_reminder else R.string.change_reminder
                         )
                     )
@@ -223,11 +335,24 @@ fun TaskEditScreen(
                             containerColor = MaterialTheme.colorScheme.secondaryContainer
                         )
                     ) {
-                        Text(
-                            stringResource(R.string.linked_to_note, currentTask.noteId!!),
-                            modifier = Modifier.padding(12.dp),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AddTask,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Text(
+                                text = stringResource(R.string.linked_to_note, currentTask.noteId!!),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
                     }
                 }
             }
@@ -250,10 +375,7 @@ fun TaskEditScreen(
             allTags = allTags,
             selectedTags = currentTags,
             onToggle = viewModel::toggleTag,
-            onCreateTag = {
-                showTagPicker = false
-                showCreateTag = true
-            },
+            onCreateTag = { showTagPicker = false; showCreateTag = true },
             onDismiss = { showTagPicker = false }
         )
     }
