@@ -1,12 +1,14 @@
 package ru.maxgog.pagebook.ui.notes
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.staggeredgrid.*
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -15,6 +17,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.maxgog.pagebook.R
 import ru.maxgog.pagebook.ui.app.EmptyState
+import ru.maxgog.pagebook.ui.components.FilterBadgeIcon
 import ru.maxgog.pagebook.ui.components.OverflowMenu
 import ru.maxgog.pagebook.ui.components.TagFilterRow
 
@@ -28,13 +31,24 @@ fun NotesScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val allTags by viewModel.allTags.collectAsStateWithLifecycle()
-    val selectedTagIds by viewModel.selectedTagIds.collectAsStateWithLifecycle()
+    val filterState by viewModel.filterState.collectAsStateWithLifecycle()
+
+    var filterRowVisible by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(filterState.count) {
+        if (filterState.count > 0) filterRowVisible = true
+    }
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text(stringResource(R.string.notes)) },
-                actions = { OverflowMenu(onSettingsClick = onSettingsClick) }
+                actions = {
+                    FilterBadgeIcon(
+                        count = filterState.count,
+                        onClick = { filterRowVisible = !filterRowVisible }
+                    )
+                    OverflowMenu(onSettingsClick = onSettingsClick)
+                }
             )
         },
         floatingActionButton = {
@@ -50,11 +64,13 @@ fun NotesScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            if (allTags.isNotEmpty()) {
+            if (filterRowVisible && allTags.isNotEmpty()) {
                 TagFilterRow(
                     allTags = allTags,
-                    selectedTagIds = selectedTagIds,
+                    selectedTagIds = filterState.tagIds,
+                    mode = filterState.mode,
                     onToggleTag = viewModel::toggleTagFilter,
+                    onToggleMode = viewModel::toggleFilterMode,
                     onClearFilters = viewModel::clearTagFilter,
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
@@ -75,7 +91,7 @@ fun NotesScreen(
                     is NotesUiState.Success -> {
                         if (state.notes.isEmpty()) {
                             EmptyState(
-                                text = if (selectedTagIds.isEmpty())
+                                text = if (filterState.isEmpty)
                                     stringResource(R.string.no_notes)
                                 else
                                     stringResource(R.string.no_matching_items),

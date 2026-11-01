@@ -110,6 +110,58 @@
 - **Затронутые экраны**: `NotesScreen`, `TaskListScreen`, `CalendarScreen`
   — над списком добавлен `Column` с `TagFilterRow`.
 
+**Tags — persist-фильтр, OR/AND, badge, редактирование и счётчик использования**
+- **`TagFilterState`** (`domain/model/`):
+  `data class TagFilterState(tagIds: Set<Int>, mode: FilterMode)` с
+  `isEmpty`/`count`. **`FilterMode`** — enum `OR`/`AND`.
+  **`TagFilterModule`** — enum `NOTES`/`TASKS`/`CALENDAR`.
+- **`TagFilterRepository`** (интерфейс) + **`TagFilterRepositoryImpl`**
+  (`@Singleton`, `DataStore<Preferences>`):
+  - `getFilter(module): Flow<TagFilterState>`;
+  - `setFilter(module, state)`;
+  - `clearFilter(module)`.
+  - Ключи `tag_filter_<module>_ids` и `tag_filter_<module>_mode`.
+  - **Persist-фильтр переживает перезапуск приложения**, отдельно для
+    каждого модуля.
+- **`applyTagFilter`** — общая утилита в **`domain/util/TagFilterExt.kt`**:
+  ```kotlin
+  fun <T> List<T>.applyTagFilter(
+      filter: TagFilterState,
+      tagsOf: (T) -> List<Tag>
+  ): List<T>
+  ```
+Устраняет дублирование OR/AND между тремя ViewModel, тестируется один раз.
+- **`FilterMode.OR` / `FilterMode.AND`** в фильтре:
+  - **OR** (по умолчанию) — сущность проходит, если есть **хотя бы один**
+    из выбранных тегов;
+  - **AND** — должны присутствовать **все** выбранные теги;
+  - переключение: **тап на чип `OR/AND`** в начале `TagFilterRow` **или
+    long-press на любом теге** (`TagChip.onLongClick` → `toggleFilterMode`).
+- **`FilterBadgeIcon`** (`ui/components/`) — `IconButton` с `BadgedBox`
+  в `TopAppBar` всех трёх главных экранов:
+  - показывает `filterState.count` (число выбранных тегов, `99+` при > 99);
+  - тап скрывает/показывает `TagFilterRow` (экономит вертикальное
+    место, когда фильтр не активен).
+- **Редактирование тегов**:
+  - **`CreateTagDialog(initialTag: Tag? = null)`** — двухрежимный диалог:
+    создание / редактирование. В режиме редактирования заголовок
+    `edit_tag`, кнопка `save`, строка `tag_usage_format`.
+  - **`TagEditViewModel`** (`@HiltViewModel`, `ui/components/`) —
+    подгружает `TagUsage` через `GetTagUsageUseCase`, отдаёт в диалог
+    через `usage: StateFlow<TagUsage?>`.
+  - **`TagChip.onEdit`** — иконка карандаша в `trailingIcon`, показывается
+    только если передан колбэк.
+  - **`TagPickerDialog.onEditTag`** — опциональный колбэк, открывает
+    `CreateTagDialog(initialTag = tag, …)` поверх пикера.
+- **Счётчик использования тега**:
+  - **`TagUsage`** (`domain/model/`): `notes` / `tasks` / `events` + `total`.
+  - **`TagDao.getTagUsage(tagId): TagUsageRow`** — один SQL-запрос
+    с 3 `COUNT(*)` по junction-таблицам `note_tag_cross_ref` /
+    `task_tag_cross_ref` / `event_tag_cross_ref`.
+  - **`GetTagUsageUseCase`** (`domain/usecase/tag/`).
+  - Отображается в `CreateTagDialog` как
+    `Заметок: N · Задач: N · Событий: N`.
+
 **Attachments — вложения для Notes и Tasks**
 - **Domain-модели**: `Attachment` (`id`, `ownerType`, `ownerId`, `type`,
   `localPath`, `mimeType`, `displayName`, `sizeBytes`, `createdAt`),
@@ -213,15 +265,19 @@
 
 **Документация**
 - `ARCHITECTURE.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `README.md` (актуализированы).
-- **`ARCHITECTURE.md`**: добавлен подраздел **«🔍 Фильтрация списков по тегам»**
-  (паттерн, код, trade-off in-memory vs SQL), mermaid-диаграмма
-  «Фильтрация списка по тегу», две новые строки в «Ключевых архитектурных решениях»
-  (`TagFilterRow` + OR-логика, `datesWithEvents` из отфильтрованного списка),
-  ссылка на `FilterChip` в «Полезных ссылках».
-- **`README.md`**: обновлены разделы возможностей (Notes / Tasks / Calendar —
-  фильтрация), новый раздел **«🏷️ Фильтрация по тегам»**, строка
-  **🏷️ Tag filtering** в стеке, `TagFilterRow` в структуре проекта,
-  новый столбец в mermaid-диаграмме, обновлённый roadmap.
+- **`ARCHITECTURE.md`**: подразделы **«🔍 Фильтрация списков по тегам»**
+  (TagFilterRow, OR/AND, persist, badge) и **«✏️ Редактирование тегов
+  и счётчик использования»** (CreateTagDialog в режиме edit, TagEditViewModel,
+  TagUsage), новые mermaid-диаграммы «Фильтрация списка по тегу (persist + OR/AND)»
+  и «Редактирование тега с usage», обновлены «Ключевые архитектурные решения»
+  и roadmap.
+- **`README.md`**: раздел «🏷️ Сквозные теги: полный цикл», новый раздел
+  «✏️ Редактирование тегов и счётчик использования», обновлённый стек
+  (Tag filtering / Tag usage / Tag editing), `FilterBadgeIcon` /
+  `TagFilterRepositoryImpl` / `TagEditViewModel` в структуре проекта,
+  новые пункты в roadmap.
+- **`CHANGELOG.md`**: добавлены блоки про persist / OR-AND / badge /
+  edit / usage, пять пунктов перенесены из `Planned` в `Added`.
 
 ### Changed
 
@@ -236,18 +292,22 @@
 **Data Layer**
 - **Репозитории** разделены на интерфейс (`domain/repository/`) и реализацию (`data/repository/`).
 - **Hilt**: единый **`RepositoryModule`** с `@Binds` + отдельный **`AttachmentsModule`**
-  (`@Binds AttachmentRepository`).
+  (`@Binds AttachmentRepository`). Добавлен `@Binds TagFilterRepository`.
 - **`NoteDao` / `TaskDao` / `EventDao`**: добавлены `@Transaction getAllWithTags()`,
   `getWithTagsById()`; `insert()` возвращает `Long`; сортировки (`AtCreated DESC`,
   `IsCompleted ASC, AtCreated DESC`, `date ASC, time ASC`).
 - **`AttachmentDao`**: добавлен `@Update suspend fun update(entity)` — для
   перепривязки pending-вложений (`ownerId = 0 → savedId`) без повторного `insert`.
+- **`TagDao`**: добавлен `getTagUsage(tagId): TagUsageRow` — 3 `COUNT(*)`
+  по junction-таблицам одним запросом.
 - **`PageBookDatabase`** — `version = 4`, `entities` включает `AttachmentEntity`.
 - **Доменные модели** `Note`, `Task`, `Event` получили `tags: List<Tag> = emptyList()`.
 - **Мапперы** перегружены: `toDomain(tags: List<Tag>)`, `WithTags.toDomain()`;
   добавлен `AttachmentMapper` (`Entity ↔ Domain`).
 - **`SettingsRepository`**: убран `LANGUAGE_KEY`, `language: Flow<...>`,
   `setLanguage()` — язык теперь хранится **только** в `AppCompatDelegate`.
+- **`DataStore<Preferences>`** теперь хранит **и тему, и фильтры тегов**
+  (`tag_filter_<module>_ids` / `tag_filter_<module>_mode`).
 
 **UI**
 - **Экраны** используют `contentPadding` вместо `Modifier.padding` (edge-to-edge).
@@ -265,6 +325,24 @@
 - **`NoteEditScreen` / `TaskEditScreen`**: добавлены кнопки `AddPhotoAlternate` и
   `AttachFile` в `TopAppBar`, `AttachmentPreviewList` под заголовком.
 - **`FormattingToolbar`**: `windowInsetsPadding(navigationBars ∪ ime)` — не уходит под клавиатуру.
+- **`TagChip`**: новые параметры `onEdit` и `onLongClick` (иконка карандаша
+  в `trailingIcon`, long-press для переключения OR↔AND).
+- **`CreateTagDialog`**: двухрежимный — создание / редактирование (`initialTag`),
+  строка `tag_usage_format` в режиме редактирования.
+- **`TagPickerDialog`**: новый параметр `onEditTag: ((Tag) -> Unit)? = null`.
+- **`TagFilterRow`**: новые параметры `mode: FilterMode` и `onToggleMode: () -> Unit`,
+  `AssistChip` режима в начале ряда.
+- **`NotesScreen` / `TaskListScreen` / `CalendarScreen`**: `FilterBadgeIcon`
+  в `actions` `TopAppBar`; `TagFilterRow` скрыт по умолчанию
+  (`rememberSaveable`), раскрывается тапом по бейджу или автоматически
+  при активном фильтре.
+- **ViewModels** (`NotesViewModel`, `TaskListViewModel`, `CalendarViewModel`):
+  `filterState: StateFlow<TagFilterState>` (persist через `TagFilterRepository`)
+  вместо локального `_selectedTagIds`; методы `toggleTagFilter`, `toggleFilterMode`,
+  `clearTagFilter`. Явный `combine<List<T>, TagFilterState, UiState>` для
+  корректной работы `.catch { emit(Error(...)) }`.
+- **`CalendarViewModel`**: `filterState` добавлен 4-м источником в `combine`;
+  `datesWithEvents` вычисляется из отфильтрованного списка.
 
   **Notifications**
 - Единая система внутренних уведомлений `AppNotificationManager` (Hilt `@Singleton`)
@@ -281,15 +359,20 @@
 - Аватар разработчика (`leadingContent`) в `AboutSettings`.
 
 **Локализация (`res/values/strings.xml`, `res/values-ru/strings.xml`)**
-- Добавлены `no_matching_items` и `clear_filters` (ru/en) для фильтрации.
+- Добавлены для фильтрации: `no_matching_items`, `clear_filters`,
+  `filter_tags`, `filter_mode_or_desc`, `filter_mode_and_desc`.
+- Добавлены для редактирования тегов: `edit_tag`, `tag_usage_format`.
 
 **Документация**
 - `ARCHITECTURE.md`: добавлены разделы «Адаптивный UI», «One-Shot Events»,
   «Настройки (DataStore + AppCompatDelegate)», **«Подсистема вложений (Attachments)»**,
-  **«Фильтрация списков по тегам»**, обновлены диаграммы (sequence для attach
-  и фильтрации), БД (`version = 4`, 8 сущностей), roadmap.
+  **«Фильтрация списков по тегам»** (persist, OR/AND, badge),
+  **«Редактирование тегов и счётчик использования»**, обновлены диаграммы
+  (sequence для attach, фильтрации, редактирования тега), БД (`version = 4`,
+  8 сущностей), roadmap.
 - `README.md`: обновлены стек (Adaptive, M3 Expressive, Attachments,
-  Tag filtering), новый раздел «🏷️ Фильтрация по тегам», roadmap.
+  Tag filtering / Tag usage / Tag editing), новые разделы «🏷️ Фильтрация
+  по тегам» и «✏️ Редактирование тегов и счётчик использования», roadmap.
 - `CHANGELOG.md`: актуализирован.
 - `CONTRIBUTING.md`: добавлен подраздел про «ловушку» с `localPath`.
 
@@ -306,6 +389,8 @@
 - `ui/dialogs/` — переехали в `ui/calendar/`.
 - **`SettingsRepository.setLanguage()`** и `LANGUAGE_KEY` — язык хранится только в `AppCompatDelegate`.
 - **`segmentedListItemColors()`** и `itemShape` — заменены на `Card(28.dp)` + `ListItem(Color.Transparent)`.
+- **`_selectedTagIds: MutableStateFlow<Set<Int>>`** во ViewModel — заменён на
+  `filterState: StateFlow<TagFilterState>` (persist через `TagFilterRepository`).
 
 ### Fixed
 - **Нижняя панель навигации** больше не исчезает (`destination.hasRoute<T>()`).
@@ -379,13 +464,17 @@
   днях с событиями.
 - **Пустой результат фильтра** больше не маскируется под «нет данных» —
   показывается отдельное сообщение «Ничего не найдено».
+- **`Type inference failed` в `.catch`** (`NotesViewModel`, `TaskListViewModel`) —
+  явные type-аргументы `combine<List<T>, TagFilterState, UiState>` гарантируют,
+  что `R = UiState`, а не `UiState.Success`, — `.catch { emit(Error(...)) }`
+  компилируется.
+- **Подсветка выбранного дня в календаре** — `day.date` из `kizitonwose` имеет
+  тип `java.time.LocalDate`, а `uiState.selectedDate`/`datesWithEvents` —
+  `kotlinx.datetime.LocalDate`. Сравнение и `in` возвращали `false` / падали
+  с `Type inference failed`. Исправлено однократной конвертацией
+  `day.date.toKotlinxLocalDate()` в `dayContent`.
 
 ### Planned
-- **Сохранение фильтра тегов** между перезапусками (`SavedStateHandle` / `DataStore`).
-- **AND-логика фильтра** (long-press на чипе) — продвинутый UX.
-- **Счётчик выбранных тегов** в `TopAppBar` (badge).
-- **Редактирование существующих тегов** (имя/цвет/эмодзи).
-- **Счётчик использования тега**.
 - **Поиск по эмодзи** в `EmojiPickerDialog`.
 - **Недавние эмодзи** (последние 20 в `DataStore`).
 - **`ListDetailPaneScaffold` для Notes и Calendar** (аналогично Tasks).
@@ -397,7 +486,8 @@
 - Резервное копирование.
 - Голосовые заметки.
 - Модуляризация (feature-модули).
-- Unit-тесты для Use Cases и Repository (в т.ч. `AttachmentRepository` и фильтрации в ViewModel).
+- Unit-тесты для Use Cases и Repository (в т.ч. `AttachmentRepository`,
+  `applyTagFilter`, `TagFilterRepositoryImpl`).
 - WorkManager для напоминаний о задачах.
 - Настройка `room.schemaLocation` (Room Gradle plugin уже подключён).
 

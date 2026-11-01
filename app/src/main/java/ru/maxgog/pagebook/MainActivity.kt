@@ -64,7 +64,6 @@ class MainActivity : AppCompatActivity() {
                         windowWidthSizeClass = windowSizeClass.widthSizeClass
                     )
 
-                    // Единственный глобальный Snackbar во всём приложении
                     SnackbarHost(
                         hostState = snackbarHostState,
                         modifier = Modifier

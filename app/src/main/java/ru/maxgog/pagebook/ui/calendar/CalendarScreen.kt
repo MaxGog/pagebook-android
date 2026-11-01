@@ -9,10 +9,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,6 +26,7 @@ import ru.maxgog.pagebook.R
 import ru.maxgog.pagebook.domain.model.Event
 import ru.maxgog.pagebook.toKotlinxLocalDate
 import ru.maxgog.pagebook.ui.app.EmptyState
+import ru.maxgog.pagebook.ui.components.FilterBadgeIcon
 import ru.maxgog.pagebook.ui.components.OverflowMenu
 import ru.maxgog.pagebook.ui.components.TagFilterRow
 import ru.maxgog.pagebook.ui.theme.AppTheme
@@ -44,7 +43,12 @@ fun CalendarScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val allTags by viewModel.allTags.collectAsStateWithLifecycle()
     val pendingTags by viewModel.pendingTags.collectAsStateWithLifecycle()
-    val selectedTagIds by viewModel.selectedTagIds.collectAsStateWithLifecycle()
+    val filterState by viewModel.filterState.collectAsStateWithLifecycle()
+
+    var filterRowVisible by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(filterState.count) {
+        if (filterState.count > 0) filterRowVisible = true
+    }
 
     val currentMonth = remember { YearMonth.now() }
     val startMonth = remember { currentMonth.minusMonths(12) }
@@ -67,6 +71,10 @@ fun CalendarScreen(
             CenterAlignedTopAppBar(
                 title = { Text(stringResource(R.string.calendar)) },
                 actions = {
+                    FilterBadgeIcon(
+                        count = filterState.count,
+                        onClick = { filterRowVisible = !filterRowVisible }
+                    )
                     OverflowMenu(onSettingsClick = onSettingsClick)
                 }
             )
@@ -100,11 +108,13 @@ fun CalendarScreen(
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                if (allTags.isNotEmpty()) {
+                if (filterRowVisible && allTags.isNotEmpty()) {
                     TagFilterRow(
                         allTags = allTags,
-                        selectedTagIds = selectedTagIds,
+                        selectedTagIds = filterState.tagIds,
+                        mode = filterState.mode,
                         onToggleTag = viewModel::toggleTagFilter,
+                        onToggleMode = viewModel::toggleFilterMode,
                         onClearFilters = viewModel::clearTagFilter,
                         modifier = Modifier.padding(vertical = 8.dp)
                     )
@@ -114,15 +124,12 @@ fun CalendarScreen(
                     state = calendarState,
                     modifier = Modifier.weight(1f),
                     dayContent = { day ->
-                        val dayEvents = remember(day.date, uiState.eventsForSelectedDate) {
-                            if (day.date == uiState.selectedDate) uiState.eventsForSelectedDate
-                            else emptyList()
-                        }
+                        val dayDate = day.date.toKotlinxLocalDate()
                         DayCell(
                             day = day,
-                            isSelected = day.date == uiState.selectedDate,
-                            hasEvents = dayEvents.isNotEmpty(),
-                            onClick = { viewModel.onDateSelected(day.date.toKotlinxLocalDate()) }
+                            isSelected = dayDate == uiState.selectedDate,
+                            hasEvents = dayDate in uiState.datesWithEvents,
+                            onClick = { viewModel.onDateSelected(dayDate) }
                         )
                     },
                     monthHeader = { month -> MonthHeader(month.yearMonth) }
@@ -131,7 +138,7 @@ fun CalendarScreen(
                 EventsList(
                     events = uiState.eventsForSelectedDate,
                     onDelete = viewModel::deleteEvent,
-                    emptyText = if (selectedTagIds.isEmpty())
+                    emptyText = if (filterState.isEmpty)
                         stringResource(R.string.no_events)
                     else
                         stringResource(R.string.no_matching_items),

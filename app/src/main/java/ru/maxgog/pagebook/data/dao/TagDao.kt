@@ -92,4 +92,18 @@ interface TagDao {
 
     @Query("SELECT EXISTS(SELECT 1 FROM event_tag_cross_ref WHERE eventId = :eventId AND tagId = :tagId)")
     suspend fun hasTagOnEvent(eventId: Int, tagId: Int): Boolean
+
+    data class TagUsageRow(
+        val notes: Int,
+        val tasks: Int,
+        val events: Int
+    )
+
+    @Query("""
+    SELECT
+      (SELECT COUNT(*) FROM note_tag_cross_ref  WHERE tagId = :tagId) AS notes,
+      (SELECT COUNT(*) FROM task_tag_cross_ref  WHERE tagId = :tagId) AS tasks,
+      (SELECT COUNT(*) FROM event_tag_cross_ref WHERE tagId = :tagId) AS events
+""")
+    suspend fun getTagUsage(tagId: Int): TagUsageRow
 }

@@ -19,13 +19,14 @@ PageBook Android следует официальным рекомендация�
 
 > **Статус миграции:** Clean Architecture полностью внедрена для всех трёх
 > модулей — **Notes**, **Tasks** и **Events (Calendar)**. Все три БД объединены
-> в одну `PageBookDatabase` (version 4). Добавлена сквозная система
-> **тегов с кастомизацией цвета и эмодзи** и **фильтрацией списков по тегам**
-> во всех трёх модулях, **подсистема вложений** (изображения + файлы,
-> хранятся в app-private storage, скачиваются через MediaStore),
-> **глобальная система уведомлений** (кастомный `Snackbar` с аватаром-фурсоной)
-> и **пасхалка** в настройках. UI переведён на Material 3 Expressive,
-> локализован на `ru`/`en`, добавлена адаптивность под планшеты.
+> в одну `PageBookDatabase` (version 4). Сквозная система **тегов с кастомизацией
+> цвета и эмодзи** доведена до полноценного UX: **фильтрация списков** (OR/AND,
+> persist через DataStore, badge с count), **редактирование тегов** и **счётчик
+> использования**. Добавлена **подсистема вложений** (изображения + файлы,
+> app-private storage, MediaStore), **глобальная система уведомлений**
+> (кастомный `Snackbar` с аватаром-фурсоной) и **пасхалка** в настройках.
+> UI переведён на Material 3 Expressive, локализован на `ru`/`en`,
+> добавлена адаптивность под планшеты.
 
 ## 🛠 Технологический стек
 
@@ -37,7 +38,7 @@ PageBook Android следует официальным рекомендация�
 | Локальное хранилище | Room (одна БД `pagebook.db`)                                  | 2.7.2          |
 | Rich text           | RichEditor (Compose Multiplatform)                            | —              |
 | Файловое хранилище  | App-private (`filesDir/attachments/`) + MediaStore (download) | —              |
-| Настройки           | DataStore Preferences (только тема)                           | 1.2.1          |
+| Настройки           | DataStore Preferences (**тема + фильтры тегов**)              | 1.2.1          |
 | Язык приложения     | `AppCompatDelegate.setApplicationLocales()`                   | appcompat 1.7  |
 | Асинхронность       | Coroutines & Flow + `Channel` для one-shot событий            | 1.10.2         |
 | DI                  | **Hilt** (`@Binds` + `@Provides`)                             | 2.56.2         |
@@ -53,29 +54,33 @@ PageBook Android следует официальным рекомендация�
 ru.maxgog.pagebook
 ├── PageBookApplication.kt        # @HiltAndroidApp
 ├── MainActivity.kt               # AppCompatActivity + enableEdgeToEdge() + setContent
-├── Converters.kt                 # LocalDate ↔ String
+├── Converters.kt                 # LocalDate ↔ String + toKotlinxLocalDate()
 │
 ├── core/
 │   └── notification/             # AppNotification, AppNotificationManager,
 │                                 #   AppNotificationType (SUCCESS/ERROR/INFO/EASTER_EGG)
 │
 ├── data/
-│   ├── dao/                      # NoteDao, TaskDao, EventDao, TagDao
+│   ├── dao/                      # NoteDao, TaskDao, EventDao, TagDao (+ TagUsageRow)
 │   ├── local/                    # AttachmentDao, AttachmentEntity
 │   ├── models/                   # Entity-классы + @Relation-обёртки
 │   ├── rooms/                    # PageBookDatabase, Migrations
 │   ├── file/                     # AttachmentFileStore, MediaStoreDownloader
 │   ├── mapper/                   # NoteMapper, TaskMapper, EventMapper, TagMapper,
 │   │                             #   AttachmentMapper
-│   ├── repository/               # *Impl, SettingsRepository (только тема)
+│   ├── repository/               # *RepositoryImpl, SettingsRepository,
+│   │                             #   TagFilterRepositoryImpl (DataStore)
 │   └── di/                       # DatabaseModule, RepositoryModule,
 │                                 #   DataStoreModule, AttachmentsModule
 │
 ├── domain/
 │   ├── model/                    # Note, Task, Event, Tag, TagColor,
-│   │                             #   Attachment, AttachmentType, OwnerType
+│   │                             #   Attachment, AttachmentType, OwnerType,
+│   │                             #   TagFilterState, FilterMode, TagFilterModule,
+│   │                             #   TagUsage
 │   ├── repository/               # Интерфейсы репозиториев
-│   └── usecase/                  # note/, task/, event/, tag/, attachment/
+│   ├── usecase/                  # note/, task/, event/, tag/, attachment/
+│   └── util/                     # TagFilterExt.kt (applyTagFilter)
 │
 └── ui/
     ├── app/                      # CombinedApp — NavigationSuiteScaffold,
@@ -83,19 +88,21 @@ ru.maxgog.pagebook
     ├── navigation/               # Destinations.kt, AppNavHost.kt, BottomNavBar.kt
     ├── notification/             # AppNotificationHost, FursonaSnackbar,
     │                             #   FursonaSnackbarVisuals
-    ├── components/               # TagChip, CompactTagChip, CreateTagDialog,
-    │                             #   TagPickerDialog, TagFilterRow,
-    │                             #   EmojiCatalog, EmojiPickerDialog,
-    │                             #   OverflowMenu, AttachmentPreviewList,
-    │                             #   AttachmentImageLoader, AttachmentPicker,
-    │                             #   ResizeImageDialog
+    ├── components/               # TagChip (+onEdit/onLongClick), CompactTagChip,
+    │                             #   CreateTagDialog (create/edit), TagPickerDialog
+    │                             #   (+onEditTag), TagFilterRow (+mode toggle),
+    │                             #   FilterBadgeIcon, TagEditViewModel,
+    │                             #   EmojiCatalog, EmojiPickerDialog, OverflowMenu,
+    │                             #   AttachmentPreviewList, AttachmentImageLoader,
+    │                             #   AttachmentPicker, ResizeImageDialog
     ├── notes/                    # NotesScreen, NoteEditScreen + ViewModels + UiStates + NoteItem
     ├── tasks/                    # TaskListScreen, TaskEditScreen, TaskItem,
     │                             #   TaskListDetailPane + ViewModels + UiStates
-    ├── calendar/                 # CalendarScreen, AddEventDialog, EventItem + ViewModel
+    ├── calendar/                 # CalendarScreen, AddEventDialog, DateTimePickerDialog,
+    │                             #   EventItem, CalendarViewModel
     ├── settings/                 # SettingsScreen, SettingsViewModel, AppLanguage,
-    │                             #   ThemePreference, LanguagePreference, SettingsGroup,
-    │                             #   FursonaEasterEgg (пасхалка)
+    │                             #   ThemePreference, LanguagePreference,
+    │                             #   SettingsGroup, FursonaEasterEgg
     └── theme/                    # Color, Type, Theme, AppTheme (enum ThemeMode)
 ```
 
@@ -144,43 +151,84 @@ abstract class PageBookDatabase : RoomDatabase() {
 - **`emoji: String?`** — опционально. Без эмодзи рисуется цветная точка, с эмодзи — символ в `leadingIcon`.
 - **`_pendingTags` / `selectedTags`** — ViewModel накапливает выбранные теги для новых (ещё не сохранённых) сущностей, привязка происходит после `save*`.
 - **`EmojiCatalog`** — статический объект (`@StringRes` для категорий), не требует сети.
+- **`TagUsage`** — счётчик использования тега (`notes` / `tasks` / `events`), вычисляется через 3 `SELECT COUNT(*)` по junction-таблицам в `TagDao.getTagUsage(tagId)`.
 
 ### 🔍 Фильтрация списков по тегам
 
 Единый паттерн во всех трёх модулях (**Notes**, **Tasks**, **Calendar**):
 
-1. **`TagFilterRow`** (`ui/components/`) — горизонтальный `LazyRow` из
-   `FilterChip` (переиспользует `TagChip`). В конце ряда появляется
-   `AssistChip` «Сбросить», если есть выбранные теги. Компонент не рендерится,
-   если `allTags` пуст.
-2. **ViewModel** хранит `_selectedTagIds: MutableStateFlow<Set<Int>>`
-   и `allTags: StateFlow<List<Tag>>` (из `GetAllTagsUseCase`).
-   В `combine(getAll*(), _selectedTagIds)` применяется фильтрация.
-3. **OR-логика**: сущность проходит фильтр, если у неё есть **хотя бы один**
-   из выбранных тегов. Пустой `Set` — фильтр выключен.
-4. **Календарь дополнительно**: `CalendarUiState.datesWithEvents: Set<LocalDate>`
-   вычисляется из **отфильтрованного** списка событий → точки-индикаторы
-   на днях автоматически сужаются под фильтр. Заодно это исправило баг —
-   раньше точка рисовалась только на выбранном дне.
-5. **Пустой результат** при активном фильтре → `EmptyState` с
+1. **`TagFilterRow`** (`ui/components/`) — горизонтальный `LazyRow`:
+   - слева — `AssistChip` режима **`OR`/`AND`** (переключается тапом);
+   - далее — `FilterChip` по каждому тегу (`TagChip` с `selected` для выбранных);
+   - **long-press на любом теге** тоже переключает режим (`onLongClick` в `TagChip`);
+   - в конце — `AssistChip` «Сбросить», если есть выбранные теги.
+   - Компонент не рендерится, если `allTags` пуст.
+2. **`FilterBadgeIcon`** (`ui/components/`) — `IconButton` с `BadgedBox` в
+   `TopAppBar`: показывает `filterState.count` (количество выбранных тегов)
+   и по тапу скрывает/показывает `TagFilterRow`. Это избавляет от лишнего
+   вертикального пространства, когда фильтр не активен.
+3. **`TagFilterState`** (`domain/model/`):
+   ```kotlin
+   data class TagFilterState(
+       val tagIds: Set<Int> = emptySet(),
+       val mode: FilterMode = FilterMode.OR  // OR | AND
+   )
+   ```
+4. **`TagFilterRepository`** (DataStore) — persist-фильтра по модулю:
+   - `getFilter(module): Flow<TagFilterState>`;
+   - `setFilter(module, state)` — пишет `tag_filter_<module>_ids` и `tag_filter_<module>_mode`;
+   - `clearFilter(module)` — сбрасывает оба ключа.
+   - `module: TagFilterModule` (`NOTES` / `TASKS` / `CALENDAR`) — каждый экран
+     помнит свой фильтр независимо.
+5. **`applyTagFilter`** (`domain/util/TagFilterExt.kt`) — общая утилита,
+   устраняющая дублирование OR/AND между тремя ViewModel:
+   ```kotlin
+   fun <T> List<T>.applyTagFilter(
+       filter: TagFilterState,
+       tagsOf: (T) -> List<Tag>
+   ): List<T> { /* OR / AND */ }
+   ```
+6. **OR-логика** — сущность проходит, если у неё есть **хотя бы один** из
+   выбранных тегов. **AND-логика** — должны присутствовать **все** выбранные
+   теги. Пустой `Set` — фильтр выключен (поведение идентично OR и AND).
+7. **Календарь дополнительно**: `CalendarUiState.datesWithEvents: Set<LocalDate>`
+   вычисляется из **отфильтрованного** списка → точки-индикаторы на днях
+   автоматически сужаются под фильтр. Заодно это исправило баг — раньше
+   точка рисовалась только на выбранном дне, а не на всех днях с событиями.
+8. **Пустой результат** при активном фильтре → `EmptyState` с
    `R.string.no_matching_items` («Ничего не найдено») вместо
    «Нет заметок / задач / событий».
 
 ```kotlin
 // Паттерн (NotesViewModel / TaskListViewModel / CalendarViewModel)
-private val _selectedTagIds = MutableStateFlow<Set<Int>>(emptySet())
-val selectedTagIds: StateFlow<Set<Int>> = _selectedTagIds.asStateFlow()
+val filterState: StateFlow<TagFilterState> = tagFilterRepository
+    .getFilter(TagFilterModule.NOTES)
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TagFilterState())
 
-val uiState = combine(getAllItems(), _selectedTagIds) { items, tagIds ->
-    val filtered = if (tagIds.isEmpty()) items
-                   else items.filter { it.tags.any { t -> t.id in tagIds } }
-    UiState.Success(filtered)
+val uiState: StateFlow<NotesUiState> = combine<List<Note>, TagFilterState, NotesUiState>(
+    getAllNotesUseCase(),
+    filterState
+) { notes, filter ->
+    NotesUiState.Success(notes.applyTagFilter(filter) { it.tags })
+}
+    .catch { emit(NotesUiState.Error(it.message ?: "Unknown error")) }
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NotesUiState.Loading)
+
+fun toggleTagFilter(tagId: Int) = viewModelScope.launch {
+    val cur = filterState.value
+    val newIds = if (tagId in cur.tagIds) cur.tagIds - tagId else cur.tagIds + tagId
+    tagFilterRepository.setFilter(TagFilterModule.NOTES, cur.copy(tagIds = newIds))
 }
 
-fun toggleTagFilter(tagId: Int) =
-    _selectedTagIds.update { if (tagId in it) it - tagId else it + tagId }
+fun toggleFilterMode() = viewModelScope.launch {
+    val cur = filterState.value
+    val newMode = if (cur.mode == FilterMode.OR) FilterMode.AND else FilterMode.OR
+    tagFilterRepository.setFilter(TagFilterModule.NOTES, cur.copy(mode = newMode))
+}
 
-fun clearTagFilter() { _selectedTagIds.value = emptySet() }
+fun clearTagFilter() = viewModelScope.launch {
+    tagFilterRepository.clearFilter(TagFilterModule.NOTES)
+}
 ```
 
 > **Почему фильтрация в ViewModel, а не SQL-запросом:** список уже
@@ -189,6 +237,28 @@ fun clearTagFilter() { _selectedTagIds.value = emptySet() }
 > данных до десятков тысяч записей имеет смысл перейти на
 > `SELECT ... WHERE id IN (SELECT noteId FROM note_tag_cross_ref WHERE tagId IN (...))`
 > с `Flow`-подпиской на параметр.
+
+### ✏️ Редактирование тегов и счётчик использования
+
+`CreateTagDialog` работает в двух режимах:
+
+| Режим | `initialTag` | Заголовок | Кнопка подтверждения | Usage |
+|:---|:---|:---|:---|:---|
+| Создание | `null` | `new_tag` | `create` | — |
+| Редактирование | `Tag` | `edit_tag` | `save` | `tag_usage_format` («Заметок: N · Задач: N · Событий: N») |
+
+- **`TagEditViewModel`** (`ui/components/`) — `@HiltViewModel`, отдельный от
+  родительского экрана. При `initialTag != null` подгружает `TagUsage`
+  через `GetTagUsageUseCase` и отдаёт в диалог через `usage: StateFlow<TagUsage?>`.
+- **`TagChip.onEdit`** — иконка карандаша в `trailingIcon`; отображается
+  только если передан колбэк. Это позволяет переиспользовать `TagChip`
+  в `TagPickerDialog` (редактирование из редакторов заметок/задач)
+  без обязательного показа кнопки.
+- **`TagPickerDialog.onEditTag`** — опциональный колбэк, который
+  открывает `CreateTagDialog(initialTag = tag, …)` поверх пикера.
+  По умолчанию `null` (в `AddEventDialog` сейчас не передаётся).
+- **`UpdateTagUseCase`** — валидирует имя (`require(trimmed.isNotEmpty())`),
+  копирует `Tag` с новыми `name`/`colorHex`/`emoji`.
 
 ## 📎 Подсистема вложений (Attachments)
 
@@ -347,30 +417,54 @@ sequenceDiagram
     Note over DB: UPDATE, а не INSERT (иначе SQLiteConstraintException)
 ```
 
-### Фильтрация списка по тегу
+### Фильтрация списка по тегу (persist + OR/AND)
 ```mermaid
 sequenceDiagram
+    participant Store as TagFilterRepository (DataStore)
+    participant VM as NotesViewModel
     participant UI as NotesScreen
     participant Row as TagFilterRow
-    participant VM as NotesViewModel
     participant Repo as NoteRepository (Room Flow)
-    participant State as NotesUiState
 
-    Note over VM: _selectedTagIds = emptySet()
-    Repo-->>VM: List<Note> (Flow из Room с @Relation tags)
-    VM->>State: Success(allNotes)
-    UI->>Row: рендер с allTags
+    Store-->>VM: Flow<TagFilterState> (из прошлой сессии)
+    Repo-->>VM: List<Note> (Flow с @Relation tags)
+    VM->>UI: NotesUiState.Success(allNotes), filterState
+    UI->>Row: рендер с allTags, mode = OR
     UI->>Row: tap по чипу "🎯 Цели"
     Row->>VM: toggleTagFilter(tagId = 7)
-    VM->>VM: _selectedTagIds += 7
-    Note over VM: combine → пересчёт
-    VM->>VM: notes.filter { note.tags.any { it.id in {7} } }
-    VM->>State: Success(filteredNotes)
-    State-->>UI: рекомпозиция LazyVerticalStaggeredGrid
-    UI->>Row: tap по чипу "Сбросить"
-    Row->>VM: clearTagFilter()
-    VM->>VM: _selectedTagIds = emptySet()
-    VM->>State: Success(allNotes) — фильтр снят
+    VM->>Store: setFilter(NOTES, ids = {7}, mode = OR)
+    Store-->>VM: Flow emits {7, OR}
+    VM->>VM: notes.applyTagFilter { it.tags }  // OR
+    VM->>UI: Success(filteredNotes)
+    UI->>Row: long-press на теге
+    Row->>VM: toggleFilterMode()
+    VM->>Store: setFilter(NOTES, ids = {7}, mode = AND)
+    Store-->>VM: Flow emits {7, AND}
+    VM->>VM: notes.applyTagFilter (AND)
+    VM->>UI: Success(filteredNotes) — рекомпозиция
+    Note over Store: после перезапуска приложения фильтр восстановлен
+```
+
+### Редактирование тега с usage
+```mermaid
+sequenceDiagram
+    participant UI as TagPickerDialog / NotesScreen
+    participant Dlg as CreateTagDialog(initialTag)
+    participant VM as TagEditViewModel
+    participant UC as GetTagUsageUseCase
+    participant TagDao
+    participant Save as UpdateTagUseCase
+
+    UI->>Dlg: open(initialTag = tag)
+    Dlg->>VM: load(tag.id)
+    VM->>UC: invoke(tag.id)
+    UC->>TagDao: getTagUsage(tag.id)
+    TagDao-->>UC: TagUsageRow(notes, tasks, events)
+    UC-->>VM: TagUsage
+    VM-->>Dlg: usage: "Заметок: 3 · Задач: 5 · Событий: 2"
+    Note over Dlg: пользователь меняет имя/цвет/эмодзи
+    Dlg->>Save: updateTag(tag, newName, newColor, newEmoji)
+    Save-->>TagDao: UPDATE tags SET ...
 ```
 
 ## 🧭 Ключевые архитектурные решения
@@ -388,8 +482,14 @@ sequenceDiagram
 | **Полиморфные вложения (`ownerType` + `ownerId`)**                           | Одна таблица и один UI-компонент для Notes и Tasks.                                                           |
 | **`localPath` — относительный путь**                                         | Отвязка от абсолютного `filesDir` (меняется между установками/бэкапами).                                      |
 | **`@Update` для pending-вложений**                                           | Избегаем `SQLiteConstraintException` при повторном `insert` с тем же `id`.                                    |
-| **Фильтрация тегов в ViewModel (OR-логика)**                                 | Реактивный `combine` без новых DAO-запросов; фильтр — часть UI-состояния, а не бизнес-логики.                 |
+| **`TagFilterRepository` на DataStore**                                       | Фильтр переживает перезапуск; каждый модуль (`NOTES`/`TASKS`/`CALENDAR`) помнит свой `tagIds + mode`.         |
+| **`TagFilterState(tagIds, mode)` в Domain**                                  | Тип-безопасное представление фильтра; легко расширять (например, `FilterMode.NOT`), не ломая ViewModel.     |
+| **`applyTagFilter` — общая утилита в `domain/util`**                         | Устраняет дублирование OR/AND между тремя ViewModel; тестируется один раз.                                    |
+| **Long-press на `TagChip` + `AssistChip` OR/AND**                            | Два пути переключения режима: быстрый (long-press) и явный (чип) для новичков.                                |
+| **`FilterBadgeIcon` в `TopAppBar`**                                          | Показывает `count`, а не весь ряд фильтров, — экономит вертикальное место, когда фильтр не активен.           |
 | **`datesWithEvents` из отфильтрованного списка**                             | Точки-индикаторы в календаре автоматически сужаются под фильтр, без дублирования логики.                      |
+| **`TagEditViewModel` отдельно от экрана**                                    | Диалог редактирования тега можно открыть из любого места (Notes/Tasks/Calendar) с идентичным UX.              |
+| **`TagUsage` из 3 `COUNT(*)` в `TagDao`**                                    | Один SQL-запрос вместо трёх последовательных; junction-таблицы уже проиндексированы по `tagId`.                |
 | **Адаптивные лейауты (`NavigationSuiteScaffold`, `ListDetailPaneScaffold`)** | Соответствие гайдлайнам Google для телефонов, планшетов и Chromebook.                                         |
 | **M3 Expressive (`Card`, `ListItem`)**                                       | Современный вид без alpha-зависимостей.                                                                       |
 | **`@StringRes` в ViewModel**                                                 | Snackbar-сообщения локализуются без утечек `Context`.                                                         |
@@ -402,7 +502,12 @@ sequenceDiagram
 - [x] Подключить **ML Kit** для извлечения дат.
 - [x] Объединить три БД в `PageBookDatabase`.
 - [x] Добавить **сквозную систему тегов** (7 цветов, many-to-many, эмодзи).
-- [x] Добавить **фильтрацию списков по тегам** (Notes / Tasks / Calendar) — OR-логика через `_selectedTagIds` в ViewModel, компонент `TagFilterRow`, кнопка «Сбросить», `datesWithEvents` в календаре.
+- [x] Добавить **фильтрацию списков по тегам** (Notes / Tasks / Calendar) — `TagFilterRow`, `datesWithEvents` в календаре.
+- [x] **Сохранение фильтра** между перезапусками — `TagFilterRepository` на `DataStore`, ключи `tag_filter_<module>_ids/mode`.
+- [x] **AND-логика фильтра** — `FilterMode.OR/AND`, long-press на теге + `AssistChip`.
+- [x] **Счётчик выбранных тегов** в `TopAppBar` — `FilterBadgeIcon` + `Badge`.
+- [x] **Редактирование существующих тегов** — `CreateTagDialog(initialTag = …)`, `TagPickerDialog.onEditTag`, `TagEditViewModel`.
+- [x] **Счётчик использования тега** — `TagDao.getTagUsage(tagId)` + `TagUsage` в диалоге редактирования.
 - [x] Реализовать **адаптивный UI** (BottomBar/Rail, два пена на планшетах).
 - [x] Перевести UI на **Material 3 Expressive** + локализация (`ru`/`en`).
 - [x] Починить смену языка через **`AppCompatDelegate`**.
@@ -410,15 +515,14 @@ sequenceDiagram
 - [x] Добавить **подсистему вложений** (изображения + файлы, общая для Notes и Tasks).
 - [x] Внедрить **глобальную систему уведомлений** с фурсоной (`AppNotificationManager` + `FursonaSnackbar`).
 - [x] Добавить **пасхалку** и аватар разработчика в настройки.
-- [ ] **Сохранение фильтра** между перезапусками (`SavedStateHandle` / `DataStore`).
-- [ ] **AND-логика фильтра** (long-press на чипе) — продвинутый UX.
-- [ ] **Счётчик выбранных тегов** в `TopAppBar` (badge).
-- [ ] Редактирование существующих тегов (имя/цвет/эмодзи) в UI.
 - [ ] Поиск по эмодзи в `EmojiPickerDialog`.
+- [ ] Недавние эмодзи (последние 20 в `DataStore`).
 - [ ] Просмотр вложений на весь экран (fullscreen viewer).
 - [ ] Камера как источник изображения (сейчас только галерея).
+- [ ] `ListDetailPaneScaffold` для Notes и Calendar (аналогично Tasks).
+- [ ] `MIGRATION_3_4` для `attachments` (сейчас `fallbackToDestructiveMigration`).
 - [ ] Модуляризация (feature-модули).
-- [ ] Unit-тесты для Use Cases и Repository (включая `AttachmentRepository` и фильтрацию в ViewModel).
+- [ ] Unit-тесты для Use Cases и Repository (включая `AttachmentRepository`, `applyTagFilter`, `TagFilterRepositoryImpl`).
 
 ## 📚 Полезные ссылки
 - [Guide to App Architecture (Google)](https://developer.android.com/topic/architecture)
@@ -433,3 +537,5 @@ sequenceDiagram
 - [MediaStore — Download files](https://developer.android.com/training/data-storage/shared/media)
 - [Photo picker](https://developer.android.com/training/data-storage/shared/photopicker)
 - [Compose — FilterChip](https://developer.android.com/develop/ui/compose/components/chip#filter-chip)
+- [Compose — Badge](https://developer.android.com/develop/ui/compose/components/badge)
+- [Material 3 — Long press / combined gestures](https://developer.android.com/develop/ui/compose/touch-input/pointer-input/drag-swipe-fling)

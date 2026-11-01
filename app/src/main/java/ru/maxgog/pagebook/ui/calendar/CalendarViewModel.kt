@@ -19,14 +19,19 @@ import kotlinx.datetime.todayIn
 import ru.maxgog.pagebook.R
 import ru.maxgog.pagebook.core.notification.AppNotificationManager
 import ru.maxgog.pagebook.domain.model.Event
+import ru.maxgog.pagebook.domain.model.FilterMode
 import ru.maxgog.pagebook.domain.model.Tag
 import ru.maxgog.pagebook.domain.model.TagColor
+import ru.maxgog.pagebook.domain.model.TagFilterModule
+import ru.maxgog.pagebook.domain.model.TagFilterState
+import ru.maxgog.pagebook.domain.repository.TagFilterRepository
 import ru.maxgog.pagebook.domain.repository.TagRepository
 import ru.maxgog.pagebook.domain.usecase.event.DeleteEventUseCase
 import ru.maxgog.pagebook.domain.usecase.event.GetAllEventsUseCase
 import ru.maxgog.pagebook.domain.usecase.event.SaveEventUseCase
 import ru.maxgog.pagebook.domain.usecase.tag.CreateTagUseCase
 import ru.maxgog.pagebook.domain.usecase.tag.GetAllTagsUseCase
+import ru.maxgog.pagebook.domain.util.applyTagFilter
 import javax.inject.Inject
 
 @HiltViewModel
@@ -37,11 +42,9 @@ class CalendarViewModel @Inject constructor(
     getAllTags: GetAllTagsUseCase,
     private val createTag: CreateTagUseCase,
     private val tagRepository: TagRepository,
+    private val tagFilterRepository: TagFilterRepository,
     private val notificationManager: AppNotificationManager
 ) : ViewModel() {
-
-    private val _selectedTagIds = MutableStateFlow<Set<Int>>(emptySet())
-    val selectedTagIds: StateFlow<Set<Int>> = _selectedTagIds.asStateFlow()
 
     private val _selectedDate = MutableStateFlow(
         Clock.System.todayIn(TimeZone.currentSystemDefault())
@@ -54,35 +57,27 @@ class CalendarViewModel @Inject constructor(
 
     val pendingTags: StateFlow<List<Tag>> = _pendingTags.asStateFlow()
 
-    val uiState: StateFlow<CalendarUiState> =
-        combine(
-            getAllEvents(),
-            _selectedDate,
-            _showDialog,
-            _selectedTagIds
-        ) { events, date, show, tagIds ->
-            val filtered = if (tagIds.isEmpty()) events
-            else events.filter { e -> e.tags.any { it.id in tagIds } }
-            CalendarUiState(
-                isLoading = false,
-                selectedDate = date,
-                eventsForSelectedDate = filtered.filter { it.date == date },
-                showAddDialog = show,
-                datesWithEvents = filtered.map { it.date }.toSet() as Set<LocalDate>
-            )
-        }
-            .catch { emit(CalendarUiState(error = it.message ?: "Unknown error")) }
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5_000),
-                initialValue = CalendarUiState()
-            )
+    val filterState: StateFlow<TagFilterState> = tagFilterRepository
+        .getFilter(TagFilterModule.CALENDAR)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TagFilterState())
 
-    fun toggleTagFilter(tagId: Int) {
-        _selectedTagIds.update { ids -> if (tagId in ids) ids - tagId else ids + tagId }
+    val uiState: StateFlow<CalendarUiState> = combine(
+        getAllEvents(),
+        _selectedDate,
+        _showDialog,
+        filterState
+    ) { events, date, show, filter ->
+        val filtered = events.applyTagFilter(filter) { it.tags }
+        CalendarUiState(
+            isLoading = false,
+            selectedDate = date,
+            eventsForSelectedDate = filtered.filter { it.date == date },
+            showAddDialog = show,
+            datesWithEvents = filtered.map { it.date }.toSet() as Set<LocalDate>
+        )
     }
-
-    fun clearTagFilter() { _selectedTagIds.value = emptySet() }
+        .catch { emit(CalendarUiState(error = it.message ?: "Unknown error")) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CalendarUiState())
 
     fun onDateSelected(date: LocalDate) { _selectedDate.value = date }
     fun showAddDialog() { _showDialog.value = true }
@@ -138,5 +133,21 @@ class CalendarViewModel @Inject constructor(
                 notificationManager.error(R.string.unknown_error)
             }
         }
+    }
+
+    fun toggleTagFilter(tagId: Int) = viewModelScope.launch {
+        val cur = filterState.value
+        val newIds = if (tagId in cur.tagIds) cur.tagIds - tagId else cur.tagIds + tagId
+        tagFilterRepository.setFilter(TagFilterModule.CALENDAR, cur.copy(tagIds = newIds))
+    }
+
+    fun toggleFilterMode() = viewModelScope.launch {
+        val cur = filterState.value
+        val newMode = if (cur.mode == FilterMode.OR) FilterMode.AND else FilterMode.OR
+        tagFilterRepository.setFilter(TagFilterModule.CALENDAR, cur.copy(mode = newMode))
+    }
+
+    fun clearTagFilter() = viewModelScope.launch {
+        tagFilterRepository.clearFilter(TagFilterModule.CALENDAR)
     }
 }

@@ -17,22 +17,64 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.toColorInt
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import ru.maxgog.pagebook.R
+import ru.maxgog.pagebook.domain.model.Tag
 import ru.maxgog.pagebook.domain.model.TagColor
+import ru.maxgog.pagebook.domain.model.TagUsage
+import ru.maxgog.pagebook.domain.usecase.tag.GetTagUsageUseCase
+import javax.inject.Inject
+
+@HiltViewModel
+class TagEditViewModel @Inject constructor(
+    private val getTagUsage: GetTagUsageUseCase
+) : ViewModel() {
+    private val _usage = MutableStateFlow<TagUsage?>(null)
+    val usage: StateFlow<TagUsage?> = _usage.asStateFlow()
+
+    fun load(tagId: Int) {
+        viewModelScope.launch { _usage.value = getTagUsage(tagId) }
+    }
+}
 
 @Composable
 fun CreateTagDialog(
     onDismiss: () -> Unit,
-    onConfirm: (name: String, color: TagColor, emoji: String?) -> Unit
+    onConfirm: (name: String, color: TagColor, emoji: String?) -> Unit,
+    initialTag: Tag? = null,
+    showUsage: Boolean = initialTag != null,
+    viewModel: TagEditViewModel = hiltViewModel()
 ) {
-    var name by remember { mutableStateOf("") }
-    var selectedColor by remember { mutableStateOf(TagColor.BLUE) }
-    var selectedEmoji by remember { mutableStateOf<String?>(null) }
+    val isEdit = initialTag != null
+    val usage by viewModel.usage.collectAsStateWithLifecycle()
+
+    LaunchedEffect(initialTag?.id) {
+        if (initialTag != null) viewModel.load(initialTag.id)
+    }
+
+    var name by remember(initialTag) { mutableStateOf(initialTag?.name ?: "") }
+    var selectedColor by remember(initialTag) {
+        mutableStateOf(
+            initialTag?.let { t -> TagColor.entries.firstOrNull { it.hex == t.colorHex } }
+                ?: TagColor.BLUE
+        )
+    }
+    var selectedEmoji by remember(initialTag) { mutableStateOf(initialTag?.emoji) }
     var showEmojiPicker by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.new_tag)) },
+        title = {
+            Text(stringResource(if (isEdit) R.string.edit_tag else R.string.new_tag))
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(
@@ -47,16 +89,11 @@ fun CreateTagDialog(
                             .background(Color(selectedColor.hex.toColorInt()).copy(alpha = 0.2f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (selectedEmoji != null) {
-                            Text(selectedEmoji!!, fontSize = 22.sp)
-                        } else {
-                            Box(
-                                Modifier
-                                    .size(14.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(selectedColor.hex.toColorInt()))
-                            )
-                        }
+                        if (selectedEmoji != null) Text(selectedEmoji!!, fontSize = 22.sp)
+                        else Box(
+                            Modifier.size(14.dp).clip(CircleShape)
+                                .background(Color(selectedColor.hex.toColorInt()))
+                        )
                     }
                     Text(
                         text = name.ifBlank { stringResource(R.string.tag_name_hint) },
@@ -87,6 +124,15 @@ fun CreateTagDialog(
                     )
                 }
 
+                if (showUsage && usage != null) {
+                    val u = usage!!
+                    Text(
+                        text = stringResource(R.string.tag_usage_format, u.notes, u.tasks, u.events),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
                 Text(stringResource(R.string.color), style = MaterialTheme.typography.titleSmall)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -113,7 +159,9 @@ fun CreateTagDialog(
             TextButton(
                 onClick = { onConfirm(name, selectedColor, selectedEmoji) },
                 enabled = name.isNotBlank()
-            ) { Text(stringResource(R.string.create)) }
+            ) {
+                Text(stringResource(if (isEdit) R.string.save else R.string.create))
+            }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } }
     )
@@ -121,10 +169,7 @@ fun CreateTagDialog(
     if (showEmojiPicker) {
         EmojiPickerDialog(
             onDismiss = { showEmojiPicker = false },
-            onEmojiSelected = { emoji ->
-                selectedEmoji = emoji
-                showEmojiPicker = false
-            }
+            onEmojiSelected = { emoji -> selectedEmoji = emoji; showEmojiPicker = false }
         )
     }
 }

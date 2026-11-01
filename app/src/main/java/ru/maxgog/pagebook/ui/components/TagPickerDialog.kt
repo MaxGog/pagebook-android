@@ -19,6 +19,7 @@ fun TagPickerDialog(
     selectedTags: List<Tag>,
     onToggle: (Tag) -> Unit,
     onCreateTag: () -> Unit,
+    onEditTag: (Tag) -> Unit = {},
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -45,6 +46,7 @@ fun TagPickerDialog(
                             tag = tag,
                             selected = isSelected,
                             onClick = { onToggle(tag) },
+                            onEdit = { onEditTag(tag) },
                             modifier = Modifier.fillMaxWidth()
                         )
                     }

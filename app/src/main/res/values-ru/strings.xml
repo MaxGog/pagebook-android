@@ -141,4 +141,13 @@
 
     <string name="no_matching_items">Ничего не найдено</string>
     <string name="clear_filters">Сбросить</string>
+
+    <!-- Tag filter -->
+    <string name="filter_tags">Фильтр по тегам</string>
+    <string name="filter_mode_or_desc">Совпадение хотя бы одного тега</string>
+    <string name="filter_mode_and_desc">Совпадение всех выбранных тегов</string>
+
+    <!-- Tag editing -->
+    <string name="edit_tag">Редактировать тег</string>
+    <string name="tag_usage_format">Заметок: %1$d · Задач: %2$d · Событий: %3$d</string>
 </resources>

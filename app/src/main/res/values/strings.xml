@@ -141,4 +141,13 @@
 
     <string name="no_matching_items">Nothing found</string>
     <string name="clear_filters">Clear</string>
+
+    <!-- Tag filter -->
+    <string name="filter_tags">Filter by tags</string>
+    <string name="filter_mode_or_desc">Match any selected tag</string>
+    <string name="filter_mode_and_desc">Match all selected tags</string>
+
+    <!-- Tag editing -->
+    <string name="edit_tag">Edit tag</string>
+    <string name="tag_usage_format">Notes: %1$d · Tasks: %2$d · Events: %3$d</string>
 </resources>

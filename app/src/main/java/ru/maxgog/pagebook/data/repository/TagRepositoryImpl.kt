@@ -9,6 +9,7 @@ import ru.maxgog.pagebook.data.models.EventTagCrossRef
 import ru.maxgog.pagebook.data.models.NoteTagCrossRef
 import ru.maxgog.pagebook.data.models.TaskTagCrossRef
 import ru.maxgog.pagebook.domain.model.Tag
+import ru.maxgog.pagebook.domain.model.TagUsage
 import ru.maxgog.pagebook.domain.repository.TagRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -76,5 +77,10 @@ class TagRepositoryImpl @Inject constructor(
 
     override suspend fun removeTagFromEvent(eventId: Int, tagId: Int) {
         tagDao.deleteEventTagCrossRef(eventId, tagId)
+    }
+
+    override suspend fun getTagUsage(tagId: Int): TagUsage {
+        val row = tagDao.getTagUsage(tagId)
+        return TagUsage(row.notes, row.tasks, row.events)
     }
 }

@@ -2,6 +2,7 @@ package ru.maxgog.pagebook.domain.repository
 
 import kotlinx.coroutines.flow.Flow
 import ru.maxgog.pagebook.domain.model.Tag
+import ru.maxgog.pagebook.domain.model.TagUsage
 
 interface TagRepository {
     // CRUD для тегов
@@ -27,4 +28,6 @@ interface TagRepository {
     suspend fun removeTagFromTask(taskId: Int, tagId: Int)
     suspend fun addTagToEvent(eventId: Int, tagId: Int)
     suspend fun removeTagFromEvent(eventId: Int, tagId: Int)
+
+    suspend fun getTagUsage(tagId: Int): TagUsage
 }
