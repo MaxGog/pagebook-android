@@ -1,12 +1,23 @@
 package ru.maxgog.pagebook.ui.notes
 
+import ru.maxgog.pagebook.domain.model.Attachment
 import ru.maxgog.pagebook.domain.model.Note
 import ru.maxgog.pagebook.domain.model.Tag
 
 sealed interface NoteEditUiState {
     data object Loading : NoteEditUiState
-    data class NewNote(val selectedTags: List<Tag> = emptyList()) : NoteEditUiState
-    data class Editing(val note: Note, val tags: List<Tag> = emptyList()) : NoteEditUiState
+
+    data class NewNote(
+        val selectedTags: List<Tag> = emptyList(),
+        val pendingAttachments: List<Attachment> = emptyList()
+    ) : NoteEditUiState
+
+    data class Editing(
+        val note: Note,
+        val tags: List<Tag> = emptyList(),
+        val attachments: List<Attachment> = emptyList()
+    ) : NoteEditUiState
+
     data class Error(val message: String) : NoteEditUiState
 }
 

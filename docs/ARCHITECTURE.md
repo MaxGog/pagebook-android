@@ -7,21 +7,23 @@ PageBook Android следует официальным рекомендация�
 
 - **UI Layer** — Compose + ViewModel + UI State.
 - **Domain Layer** — Use Cases, доменные модели, интерфейсы репозиториев.
-- **Data Layer** — Room, DAO, реализации репозиториев, мапперы, DataStore.
+- **Data Layer** — Room, DAO, реализации репозиториев, мапперы, DataStore, файловое хранилище.
 
 Внедрение зависимостей — **Hilt** (`@HiltAndroidApp`, `@HiltViewModel`,
 `@Binds`-модули в `data/di/`).
 
 Навигация — **type-safe** на основе `@Serializable` destinations
-(Navigation Compose 2.8+), с поддержкой **адаптивных лейаутов** 
-(`NavigationSuiteScaffold` для BottomBar/Rail, `ListDetailPaneScaffold` 
+(Navigation Compose 2.8+), с поддержкой **адаптивных лейаутов**
+(`NavigationSuiteScaffold` для BottomBar/Rail, `ListDetailPaneScaffold`
 для планшетов).
 
 > **Статус миграции:** Clean Architecture полностью внедрена для всех трёх
 > модулей — **Notes**, **Tasks** и **Events (Calendar)**. Все три БД объединены
-> в одну `PageBookDatabase` (version 3). Добавлена сквозная система
-> **тегов с кастомизацией цвета и эмодзи**. UI переведён на Material 3 Expressive,
-> локализован на `ru`/`en`, добавлена адаптивность под планшеты.
+> в одну `PageBookDatabase` (version 4). Добавлена сквозная система
+> **тегов с кастомизацией цвета и эмодзи**, а также **подсистема вложений**
+> (изображения + файлы, хранятся в app-private storage, скачиваются через
+> MediaStore). UI переведён на Material 3 Expressive, локализован на
+> `ru`/`en`, добавлена адаптивность под планшеты.
 
 ## 🛠 Технологический стек
 
@@ -31,6 +33,8 @@ PageBook Android следует официальным рекомендация�
 | UI                  | Jetpack Compose + **Material 3 Expressive**                   | BOM 2026.09.00 |
 | Архитектура         | Clean Architecture (UI/Domain/Data)                           | —              |
 | Локальное хранилище | Room (одна БД `pagebook.db`)                                  | 2.7.2          |
+| Rich text           | RichEditor (Compose Multiplatform)                            | —              |
+| Файловое хранилище  | App-private (`filesDir/attachments/`) + MediaStore (download) | —              |
 | Настройки           | DataStore Preferences (только тема)                           | 1.2.1          |
 | Язык приложения     | `AppCompatDelegate.setApplicationLocales()`                   | appcompat 1.7  |
 | Асинхронность       | Coroutines & Flow + `Channel` для one-shot событий            | 1.10.2         |
@@ -51,23 +55,30 @@ ru.maxgog.pagebook
 │
 ├── data/
 │   ├── dao/                      # NoteDao, TaskDao, EventDao, TagDao
+│   ├── local/                    # AttachmentDao, AttachmentEntity
 │   ├── models/                   # Entity-классы + @Relation-обёртки
 │   ├── rooms/                    # PageBookDatabase, Migrations
-│   ├── mapper/                   # NoteMapper, TaskMapper, EventMapper, TagMapper
+│   ├── file/                     # AttachmentFileStore, MediaStoreDownloader
+│   ├── mapper/                   # NoteMapper, TaskMapper, EventMapper, TagMapper,
+│   │                             #   AttachmentMapper
 │   ├── repository/               # *Impl, SettingsRepository (только тема)
-│   └── di/                       # DatabaseModule, RepositoryModule, DataStoreModule
+│   └── di/                       # DatabaseModule, RepositoryModule,
+│                                 #   DataStoreModule, AttachmentsModule
 │
 ├── domain/
-│   ├── model/                    # Note, Task, Event, Tag, TagColor
+│   ├── model/                    # Note, Task, Event, Tag, TagColor,
+│   │                             #   Attachment, AttachmentType, OwnerType
 │   ├── repository/               # Интерфейсы репозиториев
-│   └── usecase/                  # note/, task/, event/, tag/
+│   └── usecase/                  # note/, task/, event/, tag/, attachment/
 │
 └── ui/
     ├── app/                      # CombinedApp — NavigationSuiteScaffold
     ├── navigation/               # Destinations.kt, AppNavHost.kt, BottomNavBar.kt
     ├── components/               # TagChip, CompactTagChip, CreateTagDialog,
     │                             #   TagPickerDialog, EmojiCatalog, EmojiPickerDialog,
-    │                             #   OverflowMenu
+    │                             #   OverflowMenu, AttachmentPreviewList,
+    │                             #   AttachmentImageLoader, AttachmentPicker,
+    │                             #   ResizeImageDialog
     ├── notes/                    # NotesScreen, NoteEditScreen + ViewModels + UiStates + NoteItem
     ├── tasks/                    # TaskListScreen, TaskEditScreen, TaskItem,
     │                             #   TaskListDetailPane + ViewModels + UiStates
@@ -79,16 +90,18 @@ ru.maxgog.pagebook
 
 ## 💾 Единая база данных `PageBookDatabase`
 
-Проект использует **одну `RoomDatabase`** с семью сущностями — это
-необходимое условие для сквозной системы тегов через `ForeignKey`.
+Проект использует **одну `RoomDatabase`** с **восемью сущностями** — это
+необходимое условие для сквозной системы тегов через `ForeignKey` и
+хранения вложений с общим `ownerType`/`ownerId` для заметок и задач.
 
 ```kotlin
 @Database(
     entities = [
         NoteModel::class, TaskModel::class, EventModel::class, TagModel::class,
-        NoteTagCrossRef::class, TaskTagCrossRef::class, EventTagCrossRef::class
+        NoteTagCrossRef::class, TaskTagCrossRef::class, EventTagCrossRef::class,
+        AttachmentEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class PageBookDatabase : RoomDatabase() {
@@ -96,17 +109,19 @@ abstract class PageBookDatabase : RoomDatabase() {
     abstract fun taskDao(): TaskDao
     abstract fun eventDao(): EventDao
     abstract fun tagDao(): TagDao
+    abstract fun attachmentDao(): AttachmentDao
 }
 ```
 
 ### Связи между сущностями
 
-| Связь           | Реализация                                                                                        |
-|:----------------|:--------------------------------------------------------------------------------------------------|
-| **Note → Task** | `TaskModel.noteId` + `Index("NoteId")`. `onDelete = SET_NULL`.                                    |
-| **Note ↔ Tag**  | Junction `NoteTagCrossRef` с `onDelete = CASCADE`                                                 |
-| **Task ↔ Tag**  | Junction `TaskTagCrossRef` с `onDelete = CASCADE`                                                 |
-| **Event ↔ Tag** | Junction `EventTagCrossRef` с `onDelete = CASCADE`                                                |
+| Связь                        | Реализация                                                                                        |
+|:-----------------------------|:--------------------------------------------------------------------------------------------------|
+| **Note → Task**              | `TaskModel.noteId` + `Index("NoteId")`. `onDelete = SET_NULL`.                                    |
+| **Note ↔ Tag**               | Junction `NoteTagCrossRef` с `onDelete = CASCADE`                                                 |
+| **Task ↔ Tag**               | Junction `TaskTagCrossRef` с `onDelete = CASCADE`                                                 |
+| **Event ↔ Tag**              | Junction `EventTagCrossRef` с `onDelete = CASCADE`                                                |
+| **Attachment → Note / Task** | Полиморфная связь через `ownerType: OwnerType` + `ownerId: Int` + `Index("ownerType", "ownerId")` |
 
 ## 🏷️ Система тегов
 
@@ -117,6 +132,71 @@ abstract class PageBookDatabase : RoomDatabase() {
 - **`emoji: String?`** — опционально. Без эмодзи рисуется цветная точка, с эмодзи — символ в `leadingIcon`.
 - **`_pendingTags` / `selectedTags`** — ViewModel накапливает выбранные теги для новых (ещё не сохранённых) сущностей, привязка происходит после `save*`.
 - **`EmojiCatalog`** — статический объект (`@StringRes` для категорий), не требует сети.
+
+## 📎 Подсистема вложений (Attachments)
+
+Вложения поддерживаются и в заметках, и в задачах через **полиморфную
+связь** (`ownerType: OwnerType` + `ownerId: Int`). Это позволяет не
+плодить отдельные таблицы и один и тот же UI-компонент
+(`AttachmentPreviewList`) переиспользовать в обоих редакторах.
+
+### Слои
+
+| Слой       | Компоненты                                                                                                                                                                |
+|:-----------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Domain** | `Attachment` (`id`, `ownerType`, `ownerId`, `type`, `localPath`, `mimeType`, `displayName`, `sizeBytes`, `createdAt`), `AttachmentType` (`IMAGE`/`VIDEO`/`AUDIO`/`FILE`), `OwnerType` (`NOTE`/`TASK`), `AttachmentRepository`, 4 Use Case (`Save`, `Get*For*`, `Delete`, `Download`) |
+| **Data**   | `AttachmentEntity` (Room, `version = 4`), `AttachmentDao`, `AttachmentMapper`, `AttachmentRepositoryImpl`, `AttachmentFileStore` (app-private storage), `MediaStoreDownloader` (экспорт в `Pictures`/`Downloads`) |
+| **UI**     | `AttachmentPreviewList` (сетка превью + файловые чипы), `AttachmentImageLoader` (`LocalImageLoader` для RichEditor), `rememberPhotoPicker`, `rememberFilePicker`, `ResizeImageDialog` |
+
+### ⚠️ Ключевая особенность: `localPath` — относительный
+
+`AttachmentFileStore.save()` кладёт файл в `filesDir/attachments/<uuid>.<ext>`
+и возвращает **относительный** путь (`"<uuid>.<ext>"`), а не абсолютный.
+Поэтому **все** места, где нужно прочитать файл, обязаны разрешать путь
+относительно корня:
+
+```kotlin
+// ✅ Правильно
+val file = File(File(context.filesDir, "attachments"), attachment.localPath)
+
+// ❌ Неправильно — ищет файл в корне рабочей директории процесса
+val file = File(attachment.localPath)
+```
+
+Это правило касается:
+- `AttachmentPreviewList.kt` (превью в редакторах);
+- `AttachmentImageLoader.kt` (`<img src="localPath">` внутри rich-text);
+- `AttachmentFileStore.open()` (единственное место, которое уже разрешало правильно).
+
+### ⚠️ Pending-вложения новых сущностей
+
+При создании **новой** заметки/задачи вложения сохраняются с
+`ownerId = 0` (pending). После `save*` они **обновляются** (`@Update`), а не
+вставляются повторно:
+
+```kotlin
+// NoteEditViewModel.save() / TaskEditViewModel.save()
+current.pendingAttachments.forEach { pending ->
+    attachmentRepository.updateAttachment(pending.copy(ownerId = savedId.toInt()))
+}
+```
+
+Повторный `insertAttachment` **нельзя** — `pending.id != 0`, и Room бросит
+`SQLiteConstraintException` (что раньше маскировалось пустым `catch`).
+
+### Очистка pending-вложений
+
+Если пользователь выбрал файл в новой заметке, но ушёл назад без
+сохранения — `onCleared()` ViewModel удаляет `pendingAttachments` через
+`GlobalScope` (файл + запись в БД). Иначе накапливаются «сироты».
+
+### Экспорт во внешнее хранилище
+
+`MediaStoreDownloader.download()` использует `ContentResolver.insert()`
+с `MediaStore.Images/Video/Audio/Downloads`. Файл читается из app-private
+storage и копируется в общедоступную коллекцию. На Android Q+ требуется
+только `RELATIVE_PATH` для `Downloads`; для медиа `RELATIVE_PATH`
+выставляется автоматически системой.
 
 ## 🎨 Адаптивный UI и навигация
 
@@ -134,8 +214,10 @@ abstract class PageBookDatabase : RoomDatabase() {
 `NoteEditScreen`:
 - `BasicTextField` без рамки для заголовка.
 - Теги в `FlowRow` (переносятся на новую строку).
+- Превью вложений (`AttachmentPreviewList`) над редактором.
 - `RichTextEditor` на `weight(1f)`.
 - `FormattingToolbar` использует `windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))` — тулбар **всегда над клавиатурой**.
+- Кнопки «Фото» и «Файл» в `TopAppBar` — через `rememberPhotoPicker` / `rememberFilePicker`.
 
 ## ⚡ One-Shot Events (Channel)
 
@@ -193,6 +275,33 @@ sequenceDiagram
     VM-->>UI: LaunchedEffect(snackbarMessageRes) → showSnackbar
 ```
 
+### Прикрепление файла к новой заметке
+
+```mermaid
+sequenceDiagram
+    participant UI as NoteEditScreen
+    participant Picker as rememberPhotoPicker
+    participant VM as NoteEditViewModel
+    participant UC as SaveAttachmentUseCase
+    participant FS as AttachmentFileStore
+    participant DB as AttachmentRepository
+
+    UI->>Picker: pickImage()
+    Picker-->>UI: uri
+    UI->>VM: attachUri(uri)
+    VM->>UC: invoke(uri, NOTE, ownerId = 0)
+    UC->>FS: save(inputStream, ext)
+    FS-->>UC: "uuid.jpg" (relative path)
+    UC->>DB: insertAttachment(Attachment(ownerId = 0))
+    DB-->>UC: id
+    UC-->>VM: Attachment(id, ownerId = 0, localPath = "uuid.jpg")
+    VM->>VM: _uiState = NewNote(pendingAttachments += attachment)
+    Note over VM: пользователь нажимает «Сохранить»
+    VM->>DB: saveNote(...) → savedId
+    VM->>DB: updateAttachment(pending.copy(ownerId = savedId))
+    Note over DB: UPDATE, а не INSERT (иначе SQLiteConstraintException)
+```
+
 ### Смена языка
 ```mermaid
 sequenceDiagram
@@ -212,18 +321,21 @@ sequenceDiagram
 
 ## 🧭 Ключевые архитектурные решения
 
-| Решение                                                                      | Обоснование                                                            |
-|:-----------------------------------------------------------------------------|:-----------------------------------------------------------------------|
-| **Clean Architecture**                                                       | UI не зависит от схемы БД; Use Cases инкапсулируют бизнес-логику.      |
-| **Repository как интерфейс**                                                 | Позволяет подменить источник данных без изменения Domain/UI.           |
-| **UI State (sealed / data class)**                                           | Явные состояния `Loading`/`Success`/`Error` — предсказуемое поведение. |
-| **One-Shot Events (`Channel`)**                                              | Гарантирует однократный вызов `onBack()` после сохранения.             |
-| **Hilt**                                                                     | Масштабируемый DI, генерируемый на этапе компиляции.                   |
-| **Type-safe navigation**                                                     | Компилятор проверяет маршруты и аргументы.                             |
-| **`AppCompatDelegate` для языка**                                            | Единый источник правды, работающий на всех версиях Android.            |
-| **Адаптивные лейауты (`NavigationSuiteScaffold`, `ListDetailPaneScaffold`)** | Соответствие гайдлайнам Google для телефонов, планшетов и Chromebook.  |
-| **M3 Expressive (`Card`, `ListItem`)**                                       | Современный вид без alpha-зависимостей.                                |
-| **`@StringRes` в ViewModel**                                                 | Snackbar-сообщения локализуются без утечек `Context`.                  |
+| Решение                                                                      | Обоснование                                                                |
+|:-----------------------------------------------------------------------------|:---------------------------------------------------------------------------|
+| **Clean Architecture**                                                       | UI не зависит от схемы БД; Use Cases инкапсулируют бизнес-логику.          |
+| **Repository как интерфейс**                                                 | Позволяет подменить источник данных без изменения Domain/UI.               |
+| **UI State (sealed / data class)**                                           | Явные состояния `Loading`/`Success`/`Error` — предсказуемое поведение.     |
+| **One-Shot Events (`Channel`)**                                              | Гарантирует однократный вызов `onBack()` после сохранения.                 |
+| **Hilt**                                                                     | Масштабируемый DI, генерируемый на этапе компиляции.                       |
+| **Type-safe navigation**                                                     | Компилятор проверяет маршруты и аргументы.                                 |
+| **`AppCompatDelegate` для языка**                                            | Единый источник правды, работающий на всех версиях Android.                |
+| **Полиморфные вложения (`ownerType` + `ownerId`)**                           | Одна таблица и один UI-компонент для Notes и Tasks.                        |
+| **`localPath` — относительный путь**                                         | Отвязка от абсолютного `filesDir` (меняется между установками/бэкапами).   |
+| **`@Update` для pending-вложений**                                           | Избегаем `SQLiteConstraintException` при повторном `insert` с тем же `id`. |
+| **Адаптивные лейауты (`NavigationSuiteScaffold`, `ListDetailPaneScaffold`)** | Соответствие гайдлайнам Google для телефонов, планшетов и Chromebook.      |
+| **M3 Expressive (`Card`, `ListItem`)**                                       | Современный вид без alpha-зависимостей.                                    |
+| **`@StringRes` в ViewModel**                                                 | Snackbar-сообщения локализуются без утечек `Context`.                      |
 
 ## 🚀 Планы по развитию
 
@@ -236,14 +348,16 @@ sequenceDiagram
 - [x] Перевести UI на **Material 3 Expressive** + локализация (`ru`/`en`).
 - [x] Починить смену языка через **`AppCompatDelegate`**.
 - [x] Добавить **One-Shot Events** через `Channel`.
+- [x] Добавить **подсистему вложений** (изображения + файлы, общая для Notes и Tasks).
 - [ ] Фильтрация списков по тегам (Notes / Tasks / Calendar).
 - [ ] Редактирование существующих тегов (имя/цвет/эмодзи) в UI.
 - [ ] Поиск по эмодзи в `EmojiPickerDialog`.
+- [ ] Просмотр вложений на весь экран (fullscreen viewer).
+- [ ] Камера как источник изображения (сейчас только галерея).
 - [ ] Модуляризация (feature-модули).
-- [ ] Unit-тесты для Use Cases и Repository.
+- [ ] Unit-тесты для Use Cases и Repository (включая `AttachmentRepository`).
 
 ## 📚 Полезные ссылки
-*(Без изменений, добавлены ссылки на M3 Adaptive и AppCompat Locale)*
 - [Guide to App Architecture (Google)](https://developer.android.com/topic/architecture)
 - [Building adaptive apps with Jetpack Compose](https://developer.android.com/develop/ui/compose/layouts/adaptive)
 - [Per-app language preferences](https://developer.android.com/guide/topics/resources/app-languages)
@@ -253,3 +367,5 @@ sequenceDiagram
 - [Room — Relationships](https://developer.android.com/training/data-storage/room/relationships)
 - [DataStore — Preferences](https://developer.android.com/topic/libraries/architecture/datastore)
 - [Hilt — `@Binds`](https://developer.android.com/training/dependency-injection/hilt-android#hilt-modules)
+- [MediaStore — Download files](https://developer.android.com/training/data-storage/shared/media)
+- [Photo picker](https://developer.android.com/training/data-storage/shared/photopicker)

@@ -108,4 +108,15 @@
     <string name="language_system_desc">Use system language</string>
     <string name="language_ru_desc">Russian language</string>
     <string name="language_en_desc">English language</string>
+
+    <!-- 🆕 Attachments -->
+    <string name="attachments">Attachments</string>
+    <string name="add_photo">Add photo</string>
+    <string name="attach_file">Attach file</string>
+    <string name="attachment_save_error">Failed to attach file</string>
+    <string name="attachment_delete">Delete attachment</string>
+    <string name="downloaded">Saved to device</string>
+    <string name="download_error">Could not save file</string>
+    <string name="resize_image">Image size</string>
+    <string name="image_width">Width: %1$d sp</string>
 </resources>

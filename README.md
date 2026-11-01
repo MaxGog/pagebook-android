@@ -25,6 +25,8 @@ PageBook — это нативное Android-приложение для раб�
 ### 📝 Умные заметки
 - Создание и редактирование заметок с rich-text форматированием
 - Адаптивная сетка заметок (StaggeredGrid)
+- **Вложения**: фото из галереи и файлы через Photo Picker / `OpenDocument`
+- Превью вложений прямо в редакторе, скачивание в `Pictures`/`Downloads`
 - Создание задач прямо из заметок с автоматическим извлечением дат
 - **Цветные теги с эмодзи** — палитра из 7 цветов + каталог из 200+ эмодзи
 
@@ -32,6 +34,7 @@ PageBook — это нативное Android-приложение для раб�
 - Задачи с напоминаниями и связью с заметками
 - Сортировка: незавершённые сверху, новые первыми
 - Автоматическое определение даты из текста заметки (ML Kit)
+- **Вложения**: те же компоненты, что и в заметках (общая подсистема)
 - **Цветные теги с эмодзи** — общие с заметками и календарём
 
 ### 🗓️ Календарь и планирование
@@ -52,6 +55,16 @@ PageBook — это нативное Android-приложение для раб�
 на 200+ штук** в 10 категориях. Реализовано через many-to-many
 (junction-таблицы) в единой `PageBookDatabase`.
 
+### 📎 Вложения (Attachments)
+Изображения и файлы, прикреплённые к заметкам или задачам. Общая подсистема:
+- Файлы хранятся в **app-private storage** (`filesDir/attachments/`).
+- Photo Picker (`PickVisualMedia`) и `OpenDocument` для выбора.
+- Превью, удаление и экспорт в `Pictures`/`Downloads` через **MediaStore**.
+- Pending-вложения для новых сущностей: файл сохраняется сразу, а `ownerId`
+  проставляется после сохранения заметки/задачи.
+- Для `<img>` внутри rich-text — собственный `LocalImageLoader`,
+  который читает из app-private storage (см. `AttachmentImageLoader`).
+
 ### 📱 Адаптивный UI
 - **Телефоны**: `NavigationBar` + отдельные экраны
 - **Планшеты / Chromebook**: `NavigationRail` + `ListDetailPaneScaffold` (два пена рядом)
@@ -61,13 +74,15 @@ PageBook — это нативное Android-приложение для раб�
 
 - **💚 100% Kotlin** — Kotlin 2.2.20
 - **🎨 Jetpack Compose** — BOM 2026.09.00, Material 3 Expressive
-- **💾 Room Database** — единая `PageBookDatabase` (7 entities, version 3)
+- **💾 Room Database** — единая `PageBookDatabase` (8 entities, version 4)
+- **📎 Attachments** — app-private storage + MediaStore, Photo Picker
 - **⚙️ DataStore Preferences** — хранение настроек (тема)
 - **🌐 AppCompatDelegate** — смена языка (per-app language preferences)
 - **🔄 Coroutines & Flow** — реактивное программирование + `Channel` для one-shot событий
 - **🧩 Hilt** — внедрение зависимостей (`@Binds` + `@Provides`)
 - **🧭 Navigation Compose** — type-safe навигация + adaptive layouts
 - **🤖 ML Kit Entity Extraction** — извлечение дат из текста заметок
+- **📝 RichEditor** — rich-text редактор с поддержкой HTML и `<img>`
 - **📐 Material Design 3** + edge-to-edge
 - **🏗 Clean Architecture** — UI / Domain / Data
 
@@ -76,19 +91,21 @@ PageBook — это нативное Android-приложение для раб�
 ```mermaid
 graph TD
    A[UI Layer<br/>Compose + ViewModel + UiState] --> B[Domain Layer<br/>Use Cases + доменные модели]
-   B --> C[Data Layer<br/>Repository Impl + Mappers + Room + DataStore]
-   C --> D[(PageBookDatabase - Room<br/>notes, tasks, events, tags, cross-refs)]
+   B --> C[Data Layer<br/>Repository Impl + Mappers + Room + DataStore + FileStore]
+   C --> D[(PageBookDatabase - Room<br/>notes, tasks, events, tags, cross-refs, attachments)]
    C --> F[(DataStore<br/>theme)]
+   C --> G[(filesDir/attachments<br/>app-private)]
    C -.-> E[(Remote - Future)]
 ```
 
 ### Clean Architecture
 - **UI Layer**: Jetpack Compose + ViewModel + UiState (sealed interface / data class)
-- **Domain Layer**: Use Cases, доменные модели (Note, Task, Event, Tag, TagColor), интерфейсы репозиториев
-- **Data Layer**: Room, DAO, мапперы, реализации репозиториев, DataStore, Hilt-модули
+- **Domain Layer**: Use Cases, доменные модели (Note, Task, Event, Tag, TagColor, Attachment), интерфейсы репозиториев
+- **Data Layer**: Room, DAO, мапперы, реализации репозиториев, DataStore, файловое хранилище (`AttachmentFileStore`, `MediaStoreDownloader`), Hilt-модули
 
 Все три модуля — **Notes**, **Tasks**, **Calendar** — полностью на Clean Architecture.
 Теги работают сквозь все три модуля через единую `PageBookDatabase`.
+Вложения — полиморфная связь (`ownerType` + `ownerId`) через общую таблицу.
 
 Подробнее см. в [ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -122,29 +139,39 @@ graph TD
 app/src/main/java/ru/maxgog/pagebook/
 ├── data/
 │   ├── dao/            # NoteDao, TaskDao, EventDao, TagDao
+│   ├── local/          # AttachmentDao, AttachmentEntity
 │   ├── models/         # Room-сущности (@Entity) + *WithTags (@Relation)
-│   ├── rooms/          # PageBookDatabase (единая БД) + Migrations
-│   ├── mapper/         # NoteMapper, TaskMapper, EventMapper, TagMapper
+│   ├── rooms/          # PageBookDatabase (единая БД, version 4) + Migrations
+│   ├── file/           # AttachmentFileStore, MediaStoreDownloader
+│   ├── mapper/         # NoteMapper, TaskMapper, EventMapper, TagMapper,
+│   │                   #   AttachmentMapper
 │   ├── repository/     # *RepositoryImpl, SettingsRepository (DataStore)
-│   └── di/             # DatabaseModule, RepositoryModule, DataStoreModule
+│   └── di/             # DatabaseModule, RepositoryModule, DataStoreModule,
+│                       #   AttachmentsModule
 ├── domain/
-│   ├── model/          # Note, Task, Event, Tag, TagColor
+│   ├── model/          # Note, Task, Event, Tag, TagColor,
+│   │                   #   Attachment, AttachmentType, OwnerType
 │   ├── repository/     # NoteRepository, TaskRepository, EventRepository,
-│   │                   #   TagRepository (интерфейсы)
+│   │                   #   TagRepository, AttachmentRepository (интерфейсы)
 │   └── usecase/
 │       ├── note/       # GetAllNotesUseCase, SaveNoteUseCase, ...
 │       ├── task/       # GetAllTasksUseCase, SaveTaskUseCase,
 │       │               #   GetTaskByIdUseCase, CreateTaskFromNoteUseCase, ...
 │       ├── event/      # GetAllEventsUseCase, SaveEventUseCase, ...
-│       └── tag/        # GetAllTagsUseCase, CreateTagUseCase, UpdateTagUseCase,
-│                       #   DeleteTagUseCase, GetTagsFor{Note,Task,Event}UseCase,
-│                       #   ToggleTagOn{Note,Task,Event}UseCase
+│       ├── tag/        # GetAllTagsUseCase, CreateTagUseCase, UpdateTagUseCase,
+│       │               #   DeleteTagUseCase, GetTagsFor{Note,Task,Event}UseCase,
+│       │               #   ToggleTagOn{Note,Task,Event}UseCase
+│       └── attachment/ # SaveAttachmentUseCase, DeleteAttachmentUseCase,
+│                       #   DownloadAttachmentUseCase,
+│                       #   GetAttachmentsFor{Note,Task}UseCase
 ├── ui/
 │   ├── app/            # CombinedApp (NavigationSuiteScaffold)
 │   ├── navigation/     # Destinations, AppNavHost, BottomNavBar
 │   ├── components/     # TagChip, CompactTagChip, CreateTagDialog,
 │   │                   #   TagPickerDialog, EmojiCatalog, EmojiPickerDialog,
-│   │                   #   OverflowMenu
+│   │                   #   OverflowMenu, AttachmentPreviewList,
+│   │                   #   AttachmentImageLoader, AttachmentPicker,
+│   │                   #   ResizeImageDialog
 │   ├── notes/          # NotesScreen, NoteEditScreen + ViewModels + UiStates + NoteItem
 │   ├── tasks/          # TaskListScreen, TaskEditScreen, TaskItem,
 │   │                   #   TaskListDetailPane + ViewModels + UiStates
@@ -160,13 +187,14 @@ app/src/main/java/ru/maxgog/pagebook/
 
 ## 🧩 Функциональные возможности
 
-| Модуль          | Возможности                                                                         | Технологии                          |
-|-----------------|-------------------------------------------------------------------------------------|-------------------------------------|
-| **Notes** 📝    | Rich-text заметки, адаптивная сетка, ML Kit для извлечения дат, **теги с эмодзи**   | Compose, Room, RichEditor, ML Kit   |
-| **Tasks** ✅    | Задачи с напоминаниями, связь с заметками (`noteId`), сортировка, **теги с эмодзи** | Compose, StateFlow, Room            |
-| **Calendar** 🗓️ | События по датам, реактивное обновление, автоскролл, **теги с эмодзи**              | Compose, kizitonwose Calendar, Room |
-| **Settings** ⚙️ | Тема (System/Light/Dark), язык (ru/en) через AppCompatDelegate                      | Compose, DataStore, AppCompat       |
-| **Tags** 🏷️     | Сквозные теги: 7 цветов macOS + **200+ эмодзи** в 10 категориях                     | Room (@Relation + @Junction), Hilt  |
+| Модуль             | Возможности                                                                                                    | Технологии                                     |
+|--------------------|----------------------------------------------------------------------------------------------------------------|------------------------------------------------|
+| **Notes** 📝       | Rich-text заметки, адаптивная сетка, ML Kit для извлечения дат, **теги с эмодзи**, **вложения (фото + файлы)** | Compose, Room, RichEditor, ML Kit, PhotoPicker |
+| **Tasks** ✅       | Задачи с напоминаниями, связь с заметками (`noteId`), сортировка, **теги с эмодзи**, **вложения**              | Compose, StateFlow, Room                       |
+| **Calendar** 🗓️    | События по датам, реактивное обновление, автоскролл, **теги с эмодзи**                                         | Compose, kizitonwose Calendar, Room            |
+| **Settings** ⚙️    | Тема (System/Light/Dark), язык (ru/en) через AppCompatDelegate                                                 | Compose, DataStore, AppCompat                  |
+| **Tags** 🏷️        | Сквозные теги: 7 цветов macOS + **200+ эмодзи** в 10 категориях                                                | Room (@Relation + @Junction), Hilt             |
+| **Attachments** 📎 | App-private storage + MediaStore, Photo Picker, `@Update` для pending, `<img>` в rich-text                     | Room, ContentResolver, LocalImageLoader        |
 
 ## 🏷️ Система тегов
 
@@ -191,6 +219,36 @@ app/src/main/java/ru/maxgog/pagebook/
 **Отображение:**
 - **`TagChip`** (редакторы, picker) — если эмодзи задан, показывается вместо цветной точки в `leadingIcon`.
 - **`CompactTagChip`** (карточки в списках) — эмодзи идёт перед названием: `"🎯 Цели"`.
+
+## 📎 Подсистема вложений
+
+| Слой       | Компоненты                                                                                                                                     |
+|:-----------|:-----------------------------------------------------------------------------------------------------------------------------------------------|
+| **Domain** | `Attachment`, `AttachmentType` (`IMAGE`/`VIDEO`/`AUDIO`/`FILE`), `OwnerType` (`NOTE`/`TASK`), `AttachmentRepository`, 4 Use Case               |
+| **Data**   | `AttachmentEntity` (Room, `version = 4`), `AttachmentDao` (+ `@Update`), `AttachmentFileStore` (app-private), `MediaStoreDownloader` (экспорт) |
+| **UI**     | `AttachmentPreviewList`, `AttachmentImageLoader` (для `<img>` в rich-text), `rememberPhotoPicker`, `rememberFilePicker`, `ResizeImageDialog`   |
+
+### ⚠️ Важная особенность: `localPath` — относительный
+
+`AttachmentFileStore.save()` возвращает **относительный** путь
+(`"<uuid>.<ext>"`), а не абсолютный. Читать файл нужно так:
+
+```kotlin
+val file = File(File(context.filesDir, "attachments"), attachment.localPath)
+```
+
+Это правило обязательно для:
+- `AttachmentPreviewList` (превью в редакторах),
+- `AttachmentImageLoader` (картинки внутри rich-text),
+- любого нового кода, который читает `localPath`.
+
+### Pending-вложения
+
+Для **новой** (ещё не сохранённой) заметки/задачи файл сохраняется сразу
+с `ownerId = 0`. После `save*` запись **обновляется** через
+`attachmentRepository.updateAttachment(pending.copy(ownerId = savedId))` —
+повторный `insertAttachment` приведёт к `SQLiteConstraintException`
+(у `pending` уже есть `id`).
 
 ## 🛠 Разработка
 
@@ -235,12 +293,16 @@ app/src/main/java/ru/maxgog/pagebook/
 - [x] **Адаптивный UI** (`NavigationSuiteScaffold`, `ListDetailPaneScaffold`)
 - [x] **Смена языка** через `AppCompatDelegate` (единый источник правды)
 - [x] **One-Shot Events** через `Channel` для навигации
+- [x] **Вложения** для Notes и Tasks (фото + файлы, MediaStore-экспорт, pending)
 - [ ] **Смена языка на Android < 13** (требуется `AppCompatActivity`)
 - [ ] **Фильтрация списков по тегам** в Notes / Tasks / Calendar
 - [ ] **Редактирование существующих тегов** (имя/цвет/эмодзи)
 - [ ] **Счётчик использования тега** (сколько заметок/задач/событий)
 - [ ] **Поиск по эмодзи** в `EmojiPickerDialog`
 - [ ] **Недавние эмодзи** (последние 20 в `DataStore`)
+- [ ] **Fullscreen-просмотр вложений** по тапу на превью
+- [ ] **Камера как источник изображения** (сейчас только галерея + документы)
+- [ ] **`MIGRATION_3_4`** для `attachments` (сейчас `fallbackToDestructiveMigration`)
 - [ ] **Синхронизация с облаком** ☁️
 - [ ] **Виджеты для главного экрана** 🏠
 - [ ] **Резервное копирование** 💾

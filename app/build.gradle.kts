@@ -14,7 +14,7 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "ru.maxgog.pagebook"
+        applicationId = "ru.maxgog.pageru"
         minSdk = 28
         targetSdk = 37
         versionCode = 6

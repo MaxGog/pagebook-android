@@ -83,13 +83,53 @@
   (ещё не сохранённой) сущности; привязка после `save*`, когда Room
   сгенерировал `id`.
 
+**Attachments — вложения для Notes и Tasks**
+- **Domain-модели**: `Attachment` (`id`, `ownerType`, `ownerId`, `type`,
+  `localPath`, `mimeType`, `displayName`, `sizeBytes`, `createdAt`),
+  `AttachmentType` (`IMAGE`/`VIDEO`/`AUDIO`/`FILE`),
+  `OwnerType` (`NOTE`/`TASK`).
+- **`AttachmentRepository`** (интерфейс) + `AttachmentRepositoryImpl` + `AttachmentMapper`.
+- **`AttachmentEntity`** — полиморфная связь через `ownerType` + `ownerId`,
+  `Index("ownerType", "ownerId")`.
+- **`AttachmentDao`** — `getForOwner`, `getAll`, `insert`, **`update`**, `delete`.
+- **Use Cases** в `domain/usecase/attachment/`:
+  - `SaveAttachmentUseCase` — сохраняет файл в app-private storage
+    (`AttachmentFileStore`), возвращает `Attachment` с `id`.
+  - `GetAttachmentsForNoteUseCase`, `GetAttachmentsForTaskUseCase`
+    (возвращают `Flow<List<Attachment>>`).
+  - `DeleteAttachmentUseCase` — удаляет и запись, и файл с диска.
+  - `DownloadAttachmentUseCase` — экспорт в `Pictures`/`Downloads` через
+    `MediaStoreDownloader` (`ContentResolver.insert`).
+- **Data-слой**:
+  - **`AttachmentFileStore`** — app-private storage в `filesDir/attachments/`,
+    сохраняет через UUID + расширение, **возвращает относительный путь**.
+  - **`MediaStoreDownloader`** — копирует файл в `MediaStore.Images/Video/Audio/Downloads`
+    (`@RequiresApi(Q)`), `RELATIVE_PATH = DIRECTORY_DOWNLOADS` для `FILE`.
+- **Hilt-модуль** `AttachmentsModule` (`@Binds` + `@Singleton`).
+- **UI-компоненты**:
+  - **`AttachmentPreviewList`** — `FlowRow` с превью изображений и
+    `AssistChip` для файлов, кнопки «Удалить» и «Скачать».
+  - **`AttachmentImageLoader`** — реализует `LocalImageLoader` для
+    RichEditor, чтобы `<img src="...">` показывали изображения из
+    app-private storage.
+  - **`rememberPhotoPicker`** — обёртка над `PickVisualMedia` (Photo Picker).
+  - **`rememberFilePicker`** — обёртка над `OpenDocument` (`*/*`).
+  - **`ResizeImageDialog`** — Slider ширины с сохранением пропорций.
+- **Интеграция в Notes/Tasks**: кнопки «Фото» и «Файл» в `TopAppBar`
+  (активны и для сохранённых, и для новых сущностей); превью под
+  заголовком/тегами; pending-вложения для новых сущностей привязываются
+  к `ownerId` после `save*` через **`updateAttachment`**.
+
 **Единая база данных**
-- **`PageBookDatabase`** — единая `@Database` с 7 сущностями
+- **`PageBookDatabase`** — единая `@Database` с **8 сущностями**
   (`NoteModel`, `TaskModel`, `EventModel`, `TagModel`, `NoteTagCrossRef`,
-  `TaskTagCrossRef`, `EventTagCrossRef`), `version = 3`.
+  `TaskTagCrossRef`, `EventTagCrossRef`, `AttachmentEntity`), **`version = 4`**.
 - Заменяет три отдельные БД — необходимое условие для `ForeignKey` между
   сущностями и тегами.
 - **`MIGRATION_2_3`** — `ALTER TABLE tags ADD COLUMN Emoji TEXT`.
+- **`MIGRATION_3_4`** — создание таблицы `attachments` с индексами
+  (в текущей сборке используется `fallbackToDestructiveMigration()`,
+  миграция — в roadmap).
 
 **Настройки (DataStore + AppCompatDelegate)**
 - **`SettingsRepository`** — `Flow<ThemeMode>`, `setThemeMode()`. Хранит тему в `DataStore<Preferences>`.
@@ -142,7 +182,7 @@
   Room Gradle plugin, `androidx.datastore:datastore-preferences`,
   `androidx.appcompat:appcompat`, **`material3-adaptive-navigation-suite`**,
   **`material3-adaptive` / `adaptive-layout` / `adaptive-navigation`**,
-  **`material3-window-size-class`**.
+  **`material3-window-size-class`**, `com.mohamedrejeb.richeditor:richeditor-compose`.
 
 **Документация**
 - `ARCHITECTURE.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `README.md` (актуализированы).
@@ -159,12 +199,17 @@
 
 **Data Layer**
 - **Репозитории** разделены на интерфейс (`domain/repository/`) и реализацию (`data/repository/`).
-- **Hilt**: единый **`RepositoryModule`** с `@Binds` (4 привязки).
+- **Hilt**: единый **`RepositoryModule`** с `@Binds` + отдельный **`AttachmentsModule`**
+  (`@Binds AttachmentRepository`).
 - **`NoteDao` / `TaskDao` / `EventDao`**: добавлены `@Transaction getAllWithTags()`,
   `getWithTagsById()`; `insert()` возвращает `Long`; сортировки (`AtCreated DESC`,
   `IsCompleted ASC, AtCreated DESC`, `date ASC, time ASC`).
+- **`AttachmentDao`**: добавлен `@Update suspend fun update(entity)` — для
+  перепривязки pending-вложений (`ownerId = 0 → savedId`) без повторного `insert`.
+- **`PageBookDatabase`** — `version = 4`, `entities` включает `AttachmentEntity`.
 - **Доменные модели** `Note`, `Task`, `Event` получили `tags: List<Tag> = emptyList()`.
-- **Мапперы** перегружены: `toDomain(tags: List<Tag>)`, `WithTags.toDomain()`.
+- **Мапперы** перегружены: `toDomain(tags: List<Tag>)`, `WithTags.toDomain()`;
+  добавлен `AttachmentMapper` (`Entity ↔ Domain`).
 - **`SettingsRepository`**: убран `LANGUAGE_KEY`, `language: Flow<...>`,
   `setLanguage()` — язык теперь хранится **только** в `AppCompatDelegate`.
 
@@ -181,12 +226,17 @@
 - **`SettingsScreen`**: `SettingsGroup` (Card 28dp) + `ListItem` с прозрачным фоном;
   секции с `SettingsSection`; `AboutSettings` в `Card`.
 - **`AppLanguage`**: `SYSTEM(null)`, `RUSSIAN("ru")`, `ENGLISH("en")`, `@StringRes` названия.
+- **`NoteEditScreen` / `TaskEditScreen`**: добавлены кнопки `AddPhotoAlternate` и
+  `AttachFile` в `TopAppBar`, `AttachmentPreviewList` под заголовком.
+- **`FormattingToolbar`**: `windowInsetsPadding(navigationBars ∪ ime)` — не уходит под клавиатуру.
 
 **Документация**
 - `ARCHITECTURE.md`: добавлены разделы «Адаптивный UI», «One-Shot Events»,
-  «Настройки (DataStore + AppCompatDelegate)», обновлены диаграммы, roadmap.
-- `README.md`: обновлены стек (Adaptive, M3 Expressive), roadmap.
+  «Настройки (DataStore + AppCompatDelegate)», **«Подсистема вложений (Attachments)»**,
+  обновлены диаграммы (sequence для attach), БД (`version = 4`, 8 сущностей), roadmap.
+- `README.md`: обновлены стек (Adaptive, M3 Expressive, Attachments), roadmap.
 - `CHANGELOG.md`: актуализирован.
+- `CONTRIBUTING.md`: добавлен подраздел про «ловушку» с `localPath`.
 
 ### Removed
 - `accompanist-systemuicontroller` (deprecated → `enableEdgeToEdge()`).
@@ -206,7 +256,7 @@
 - **Нижняя панель навигации** больше не исчезает (`destination.hasRoute<T>()`).
 - **Краш `Cannot find startDestination`** — `composable<TaskListDestination>` зарегистрирован.
 - **Краш `Destination TaskEditDestination cannot be found`** — добавлен в граф.
-- **Краш `Room cannot verify the data integrity`** — версия БД увеличена, `MIGRATION_2_3`.
+- **Краш `Room cannot verify the data integrity`** — версия БД увеличена, `MIGRATION_2_3` / `MIGRATION_3_4`.
 - **Краш `[Dagger/DuplicateBindings] TagRepository`** — удалены старые модули.
 - **Краш `[Dagger/MissingBinding] EventRepository`** — `RepositoryModule` с `@Binds`.
 - **Контент экранов** больше не перекрывается системными барами (`Modifier.padding(innerPadding)`).
@@ -235,6 +285,27 @@
 - **`BuildConfig` не компилировался** — `buildConfig = true` в `build.gradle.kts`.
 - **`SegmentListItem` не компилировался** — заменён на стабильные `ListItem` + `Card`.
 
+**Attachments**
+- **Изображения не отображались** (`AttachmentPreviewList`, `AttachmentImageLoader`) —
+  `File(attachment.localPath)` искал файл в корне рабочей директории, а
+  `AttachmentFileStore` возвращает **относительный** путь. Теперь путь
+  разрешается относительно `File(context.filesDir, "attachments")`.
+- **Изображения из rich-text не грузились** (`<img src="...">`) — та же причина
+  + неверный каст `ImageBitmap as Painter`. Заменено на
+    `BitmapPainter(bitmap.asImageBitmap())`.
+- **Заметка/задача «не сохранялась» с прикреплённым фото** — в
+  `NoteEditViewModel.save()` / `TaskEditViewModel.save()` для pending-вложений
+  вызывался повторный `insertAttachment` с уже существующим `id`, что
+  приводило к `SQLiteConstraintException`. Заменено на `updateAttachment`
+  (новый метод в `AttachmentRepository` + `@Update` в `AttachmentDao`).
+- **Ошибки сохранения маскировались** — `catch (_: Exception) { }` в
+  `NoteEditViewModel.save` / `TaskEditViewModel.save` заменён на
+  `catch (e: Exception) { Log.e(...); _snackbarMessageRes.value = R.string.unknown_error }`.
+  Пользователь теперь видит snackbar вместо «зависшего» экрана.
+- **«Осиротевшие» pending-вложения** при уходе без сохранения — добавлена
+  очистка в `onCleared()` (файл + запись в БД удаляются через `GlobalScope`,
+  т.к. `viewModelScope` уже отменён).
+
 ### Planned
 - **Смена языка на Android < 13** — миграция `MainActivity` на `AppCompatActivity` и темы на `Theme.AppCompat.*`.
 - **Фильтрация списков по тегам** (Notes / Tasks / Calendar).
@@ -243,12 +314,15 @@
 - **Поиск по эмодзи** в `EmojiPickerDialog`.
 - **Недавние эмодзи** (последние 20 в `DataStore`).
 - **`ListDetailPaneScaffold` для Notes и Calendar** (аналогично Tasks).
+- **Fullscreen-просмотр вложений** по тапу на превью.
+- **Камера как источник изображения** (сейчас только галерея + документы).
+- **`MIGRATION_3_4`** для `attachments` (сейчас `fallbackToDestructiveMigration`).
 - Синхронизация с облаком.
 - Виджеты для главного экрана.
 - Резервное копирование.
 - Голосовые заметки.
 - Модуляризация (feature-модули).
-- Unit-тесты для Use Cases и Repository.
+- Unit-тесты для Use Cases и Repository (в т.ч. `AttachmentRepository`).
 - WorkManager для напоминаний о задачах.
 - Настройка `room.schemaLocation` (Room Gradle plugin уже подключён).
 

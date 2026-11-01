@@ -108,4 +108,15 @@
     <string name="language_system_desc">Язык системы</string>
     <string name="language_ru_desc">Русский язык</string>
     <string name="language_en_desc">Английский язык</string>
+
+    <!-- 🆕 Attachments -->
+    <string name="attachments">Вложения</string>
+    <string name="add_photo">Добавить фото</string>
+    <string name="attach_file">Прикрепить файл</string>
+    <string name="attachment_save_error">Не удалось прикрепить файл</string>
+    <string name="attachment_delete">Удалить вложение</string>
+    <string name="downloaded">Сохранено на устройство</string>
+    <string name="download_error">Не удалось сохранить файл</string>
+    <string name="resize_image">Размер изображения</string>
+    <string name="image_width">Ширина: %1$d sp</string>
 </resources>

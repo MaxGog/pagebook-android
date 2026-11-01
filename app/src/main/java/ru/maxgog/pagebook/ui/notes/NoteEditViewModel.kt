@@ -1,5 +1,7 @@
 package ru.maxgog.pagebook.ui.notes
 
+import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -13,10 +15,17 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.maxgog.pagebook.R
+import ru.maxgog.pagebook.domain.model.Attachment
 import ru.maxgog.pagebook.domain.model.Note
+import ru.maxgog.pagebook.domain.model.OwnerType
 import ru.maxgog.pagebook.domain.model.Tag
 import ru.maxgog.pagebook.domain.model.TagColor
+import ru.maxgog.pagebook.domain.repository.AttachmentRepository
 import ru.maxgog.pagebook.domain.repository.TagRepository
+import ru.maxgog.pagebook.domain.usecase.attachment.DeleteAttachmentUseCase
+import ru.maxgog.pagebook.domain.usecase.attachment.DownloadAttachmentUseCase
+import ru.maxgog.pagebook.domain.usecase.attachment.GetAttachmentsForNoteUseCase
+import ru.maxgog.pagebook.domain.usecase.attachment.SaveAttachmentUseCase
 import ru.maxgog.pagebook.domain.usecase.note.DeleteNoteUseCase
 import ru.maxgog.pagebook.domain.usecase.note.GetNoteByIdUseCase
 import ru.maxgog.pagebook.domain.usecase.note.SaveNoteUseCase
@@ -40,7 +49,12 @@ class NoteEditViewModel @Inject constructor(
     private val createTag: CreateTagUseCase,
     private val tagRepository: TagRepository,
     private val createTaskFromNote: CreateTaskFromNoteUseCase,
-    private val saveTask: SaveTaskUseCase
+    private val saveTask: SaveTaskUseCase,
+    private val saveAttachment: SaveAttachmentUseCase,
+    private val getAttachmentsForNote: GetAttachmentsForNoteUseCase,
+    private val deleteAttachment: DeleteAttachmentUseCase,
+    private val downloadAttachment: DownloadAttachmentUseCase,
+    private val attachmentRepository: AttachmentRepository
 ) : ViewModel() {
 
     private val noteId: Int? = savedStateHandle.get<Int>("noteId")
@@ -60,6 +74,8 @@ class NoteEditViewModel @Inject constructor(
     val allTags: StateFlow<List<Tag>> = getAllTags()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    private var saved = false
+
     init {
         viewModelScope.launch {
             _uiState.value = if (noteId == null) {
@@ -77,6 +93,14 @@ class NoteEditViewModel @Inject constructor(
                     val current = _uiState.value
                     if (current is NoteEditUiState.Editing) {
                         _uiState.value = current.copy(tags = tags)
+                    }
+                }
+            }
+            viewModelScope.launch {
+                getAttachmentsForNote(id).collect { attachments ->
+                    val current = _uiState.value
+                    if (current is NoteEditUiState.Editing) {
+                        _uiState.value = current.copy(attachments = attachments)
                     }
                 }
             }
@@ -107,6 +131,59 @@ class NoteEditViewModel @Inject constructor(
         }
     }
 
+    fun attachUri(uri: Uri) {
+        viewModelScope.launch {
+            try {
+                when (val current = _uiState.value) {
+                    is NoteEditUiState.Editing -> {
+                        saveAttachment(uri, OwnerType.NOTE, current.note.id)
+                    }
+                    is NoteEditUiState.NewNote -> {
+                        // ownerId = 0 → pending, привяжем при save
+                        val pending = saveAttachment(uri, OwnerType.NOTE, 0)
+                        _uiState.value = current.copy(
+                            pendingAttachments = current.pendingAttachments + pending
+                        )
+                    }
+                    else -> Unit
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "attachUri failed", e)
+                _snackbarMessageRes.value = R.string.attachment_save_error
+            }
+        }
+    }
+
+    fun removeAttachment(attachment: Attachment) {
+        val current = _uiState.value
+        when (current) {
+            is NoteEditUiState.Editing -> viewModelScope.launch {
+                deleteAttachment(attachment)
+            }
+            is NoteEditUiState.NewNote -> {
+                viewModelScope.launch {
+                    deleteAttachment(attachment)
+                    _uiState.value = current.copy(
+                        pendingAttachments = current.pendingAttachments - attachment
+                    )
+                }
+            }
+            else -> Unit
+        }
+    }
+
+    fun downloadAttachment(attachment: Attachment) {
+        viewModelScope.launch {
+            try {
+                downloadAttachment.invoke(attachment)
+                _snackbarMessageRes.value = R.string.downloaded
+            } catch (e: Exception) {
+                Log.e(TAG, "downloadAttachment failed", e)
+                _snackbarMessageRes.value = R.string.download_error
+            }
+        }
+    }
+
     fun save(title: String, content: String) {
         viewModelScope.launch {
             val current = _uiState.value
@@ -121,10 +198,17 @@ class NoteEditViewModel @Inject constructor(
                     current.selectedTags.forEach { tag ->
                         tagRepository.addTagToNote(savedId.toInt(), tag.id)
                     }
+                    current.pendingAttachments.forEach { pending ->
+                        attachmentRepository.updateAttachment(
+                            pending.copy(ownerId = savedId.toInt())
+                        )
+                    }
                 }
+                saved = true
                 _events.send(NoteEditEvent.Saved)
             } catch (e: Exception) {
-                null
+                Log.e(TAG, "save note failed", e)
+                _snackbarMessageRes.value = R.string.unknown_error
             }
         }
     }
@@ -133,6 +217,7 @@ class NoteEditViewModel @Inject constructor(
         val current = _uiState.value
         if (current is NoteEditUiState.Editing) {
             viewModelScope.launch {
+                current.attachments.forEach { deleteAttachment(it) }
                 deleteNote(current.note)
                 _events.send(NoteEditEvent.Deleted)
             }
@@ -141,7 +226,6 @@ class NoteEditViewModel @Inject constructor(
 
     fun createTaskFromCurrentNote() {
         val current = _uiState.value as? NoteEditUiState.Editing ?: return
-
         viewModelScope.launch {
             _taskCreating.value = true
             try {
@@ -150,12 +234,10 @@ class NoteEditViewModel @Inject constructor(
                     noteTitle = current.note.title
                 )
                 saveTask(task.copy(noteId = current.note.id))
-
                 _snackbarMessageRes.value = if (task.hasReminder)
-                    R.string.task_created_with_reminder
-                else
-                    R.string.task_created
+                    R.string.task_created_with_reminder else R.string.task_created
             } catch (e: Exception) {
+                Log.e(TAG, "createTask failed", e)
                 _snackbarMessageRes.value = R.string.task_creation_error
             } finally {
                 _taskCreating.value = false
@@ -165,5 +247,21 @@ class NoteEditViewModel @Inject constructor(
 
     fun clearSnackbar() {
         _snackbarMessageRes.value = null
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        if (!saved) {
+            val pending = (_uiState.value as? NoteEditUiState.NewNote)?.pendingAttachments.orEmpty()
+            if (pending.isNotEmpty()) {
+                kotlinx.coroutines.GlobalScope.launch {
+                    pending.forEach { runCatching { deleteAttachment(it) } }
+                }
+            }
+        }
+    }
+
+    private companion object {
+        const val TAG = "NoteEditViewModel"
     }
 }

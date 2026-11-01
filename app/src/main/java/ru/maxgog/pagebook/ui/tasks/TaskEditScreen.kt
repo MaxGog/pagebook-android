@@ -6,6 +6,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Label
@@ -19,10 +21,13 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.maxgog.pagebook.R
+import ru.maxgog.pagebook.ui.components.AttachmentPreviewList
 import ru.maxgog.pagebook.ui.components.CreateTagDialog
 import ru.maxgog.pagebook.ui.components.DateTimePickerDialog
 import ru.maxgog.pagebook.ui.components.TagChip
 import ru.maxgog.pagebook.ui.components.TagPickerDialog
+import ru.maxgog.pagebook.ui.components.rememberFilePicker
+import ru.maxgog.pagebook.ui.components.rememberPhotoPicker
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -54,6 +59,15 @@ fun TaskEditScreen(
     var description by remember(currentTask?.id) { mutableStateOf(currentTask?.description ?: "") }
     var reminderTime by remember(currentTask?.id) { mutableStateOf(currentTask?.reminderTime) }
 
+    val pickImage = rememberPhotoPicker { uri -> viewModel.attachUri(uri) }
+    val pickFile = rememberFilePicker { uri -> viewModel.attachUri(uri) }
+
+    val currentAttachments = when (val s = uiState) {
+        is TaskEditUiState.Editing -> s.attachments
+        is TaskEditUiState.NewTask -> s.pendingAttachments
+        else -> emptyList()
+    }
+
     LaunchedEffect(taskId) {
         if (taskId != null) viewModel.setTaskId(taskId)
     }
@@ -82,6 +96,12 @@ fun TaskEditScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { pickImage() }) {
+                        Icon(Icons.Default.AddPhotoAlternate, contentDescription = stringResource(R.string.add_photo))
+                    }
+                    IconButton(onClick = { pickFile() }) {
+                        Icon(Icons.Default.AttachFile, contentDescription = stringResource(R.string.attach_file))
+                    }
                     IconButton(onClick = { showTagPicker = true }) {
                         Icon(Icons.Default.Label, contentDescription = stringResource(R.string.tags))
                     }
@@ -134,7 +154,13 @@ fun TaskEditScreen(
                     maxLines = 6,
                     shape = MaterialTheme.shapes.large
                 )
-
+                if (currentAttachments.isNotEmpty()) {
+                    AttachmentPreviewList(
+                        attachments = currentAttachments,
+                        onRemove = viewModel::removeAttachment,
+                        onDownload = viewModel::downloadAttachment
+                    )
+                }
                 if (currentTags.isNotEmpty()) {
                     Row(
                         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),

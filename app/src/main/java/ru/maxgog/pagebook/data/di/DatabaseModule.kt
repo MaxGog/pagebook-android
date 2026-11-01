@@ -8,6 +8,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import ru.maxgog.pagebook.data.dao.*
+import ru.maxgog.pagebook.data.local.AttachmentDao
 import ru.maxgog.pagebook.data.rooms.PageBookDatabase
 import javax.inject.Singleton
 
@@ -26,4 +27,6 @@ object DatabaseModule {
     @Provides fun provideTaskDao(db: PageBookDatabase): TaskDao = db.taskDao()
     @Provides fun provideEventDao(db: PageBookDatabase): EventDao = db.eventDao()
     @Provides fun provideTagDao(db: PageBookDatabase): TagDao = db.tagDao()
+
+    @Provides fun provideAttachmentDao(db: PageBookDatabase): AttachmentDao = db.attachmentDao()
 }
