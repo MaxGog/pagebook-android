@@ -16,6 +16,8 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
+import ru.maxgog.pagebook.R
+import ru.maxgog.pagebook.core.notification.AppNotificationManager
 import ru.maxgog.pagebook.domain.model.Event
 import ru.maxgog.pagebook.domain.model.Tag
 import ru.maxgog.pagebook.domain.model.TagColor
@@ -34,7 +36,8 @@ class CalendarViewModel @Inject constructor(
     private val deleteEventUseCase: DeleteEventUseCase,
     getAllTags: GetAllTagsUseCase,
     private val createTag: CreateTagUseCase,
-    private val tagRepository: TagRepository
+    private val tagRepository: TagRepository,
+    private val notificationManager: AppNotificationManager
 ) : ViewModel() {
 
     private val _selectedDate = MutableStateFlow(
@@ -43,11 +46,9 @@ class CalendarViewModel @Inject constructor(
     private val _showDialog = MutableStateFlow(false)
     private val _pendingTags = MutableStateFlow<List<Tag>>(emptyList())
 
-    // Все теги для picker'а
     val allTags: StateFlow<List<Tag>> = getAllTags()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    // Выбранные теги для нового события
     val pendingTags: StateFlow<List<Tag>> = _pendingTags.asStateFlow()
 
     val uiState: StateFlow<CalendarUiState> =
@@ -67,12 +68,11 @@ class CalendarViewModel @Inject constructor(
             )
 
     fun onDateSelected(date: LocalDate) { _selectedDate.value = date }
-
     fun showAddDialog() { _showDialog.value = true }
 
     fun hideAddDialog() {
         _showDialog.value = false
-        _pendingTags.value = emptyList()   // сбрасываем при отмене
+        _pendingTags.value = emptyList()
     }
 
     fun toggleTag(tag: Tag) {
@@ -96,25 +96,30 @@ class CalendarViewModel @Inject constructor(
 
     fun addEvent(title: String, description: String, date: LocalDate, time: String) {
         viewModelScope.launch {
-            val eventId = saveEvent(
-                Event(
-                    title = title,
-                    description = description,
-                    date = date,
-                    time = time
+            try {
+                val eventId = saveEvent(
+                    Event(title = title, description = description, date = date, time = time)
                 )
-            )
-
-            _pendingTags.value.forEach { tag ->
-                tagRepository.addTagToEvent(eventId.toInt(), tag.id)
+                _pendingTags.value.forEach { tag ->
+                    tagRepository.addTagToEvent(eventId.toInt(), tag.id)
+                }
+                _showDialog.value = false
+                _pendingTags.value = emptyList()
+                notificationManager.success(R.string.event_added)
+            } catch (e: Exception) {
+                notificationManager.error(R.string.unknown_error)
             }
-
-            _showDialog.value = false
-            _pendingTags.value = emptyList()
         }
     }
 
     fun deleteEvent(event: Event) {
-        viewModelScope.launch { deleteEventUseCase(event) }
+        viewModelScope.launch {
+            try {
+                deleteEventUseCase(event)
+                notificationManager.success(R.string.event_deleted)
+            } catch (e: Exception) {
+                notificationManager.error(R.string.unknown_error)
+            }
+        }
     }
 }

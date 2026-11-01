@@ -43,11 +43,20 @@ PageBook — это нативное Android-приложение для раб�
 - Быстрый скролл к выбранной дате
 - **Цветные теги с эмодзи** для категоризации событий
 
-### ⚙️ Настройки
+### ⚙️ Настройки и пасхалка
 - Переключение темы: **System / Light / Dark** (сохраняется в `DataStore`)
 - Переключение языка: **Русский / English** через `AppCompatDelegate`
 - **Реактивное** применение без перезапуска приложения
 - **Material 3 Expressive** дизайн: группы в карточках, пояснительный текст
+- **Аватар разработчика** в разделе «О приложении»
+- **Секретная пасхалка**: 7 тапов по номеру версии откроют скрытую карточку с фурсоной 🦊
+
+### 🔔 Умные уведомления (Snackbar)
+Единая глобальная система уведомлений для всего приложения:
+- **Кастомный дизайн**: `FursonaSnackbar` с аватаром-фурсоной, которая элегантно выглядывает из-за края плашки.
+- **Типы уведомлений**: `SUCCESS` (зелёный), `ERROR` (красный), `INFO` (серый), `EASTER_EGG` (фиолетовый).
+- **Надежность**: базируется на `Channel` и `@Singleton` через Hilt (гарантирует доставку ровно один раз).
+- Больше не нужно дублировать `SnackbarHost` на каждом экране — всё управляется из `MainActivity`.
 
 ### 🏷️ Сквозные теги с эмодзи
 Один тег — на заметке, задаче и событии одновременно. Каждый тег можно
@@ -76,6 +85,7 @@ PageBook — это нативное Android-приложение для раб�
 - **🎨 Jetpack Compose** — BOM 2026.09.00, Material 3 Expressive
 - **💾 Room Database** — единая `PageBookDatabase` (8 entities, version 4)
 - **📎 Attachments** — app-private storage + MediaStore, Photo Picker
+- **🔔 Notifications** — глобальный `SnackbarHost` + `Channel` + Hilt Singleton
 - **⚙️ DataStore Preferences** — хранение настроек (тема)
 - **🌐 AppCompatDelegate** — смена языка (per-app language preferences)
 - **🔄 Coroutines & Flow** — реактивное программирование + `Channel` для one-shot событий
@@ -95,13 +105,16 @@ graph TD
    C --> D[(PageBookDatabase - Room<br/>notes, tasks, events, tags, cross-refs, attachments)]
    C --> F[(DataStore<br/>theme)]
    C --> G[(filesDir/attachments<br/>app-private)]
+   
+   A -.->|AppNotificationManager| H[Global Snackbar<br/>FursonaSnackbar]
    C -.-> E[(Remote - Future)]
 ```
 
 ### Clean Architecture
-- **UI Layer**: Jetpack Compose + ViewModel + UiState (sealed interface / data class)
+- **UI Layer**: Jetpack Compose + ViewModel + UiState (sealed interface / data class). Глобальный `Snackbar` управляется из `MainActivity` через `AppNotificationHost`.
 - **Domain Layer**: Use Cases, доменные модели (Note, Task, Event, Tag, TagColor, Attachment), интерфейсы репозиториев
 - **Data Layer**: Room, DAO, мапперы, реализации репозиториев, DataStore, файловое хранилище (`AttachmentFileStore`, `MediaStoreDownloader`), Hilt-модули
+- **Core Layer**: `AppNotificationManager` (синглтон для событий UI).
 
 Все три модуля — **Notes**, **Tasks**, **Calendar** — полностью на Clean Architecture.
 Теги работают сквозь все три модуля через единую `PageBookDatabase`.
@@ -126,17 +139,19 @@ graph TD
    ```
 
 2. **Откройте в Android Studio**
-   - File → Open → Выберите папку проекта
-   - Дождитесь завершения сборки зависимостей
+    - File → Open → Выберите папку проекта
+    - Дождитесь завершения сборки зависимостей
 
 3. **Запустите приложение**
-   - Подключите Android-устройство или запустите эмулятор
-   - Нажмите ▶️ Run или `Ctrl + R`
+    - Подключите Android-устройство или запустите эмулятор
+    - Нажмите ▶️ Run или `Ctrl + R`
 
 ## 📁 Структура проекта
 
 ```
 app/src/main/java/ru/maxgog/pagebook/
+├── core/
+│   └── notification/   # AppNotification, AppNotificationManager, AppNotificationType
 ├── data/
 │   ├── dao/            # NoteDao, TaskDao, EventDao, TagDao
 │   ├── local/          # AttachmentDao, AttachmentEntity
@@ -165,8 +180,9 @@ app/src/main/java/ru/maxgog/pagebook/
 │                       #   DownloadAttachmentUseCase,
 │                       #   GetAttachmentsFor{Note,Task}UseCase
 ├── ui/
-│   ├── app/            # CombinedApp (NavigationSuiteScaffold)
+│   ├── app/            # CombinedApp, MainViewModel
 │   ├── navigation/     # Destinations, AppNavHost, BottomNavBar
+│   ├── notification/   # AppNotificationHost, FursonaSnackbar, FursonaSnackbarVisuals
 │   ├── components/     # TagChip, CompactTagChip, CreateTagDialog,
 │   │                   #   TagPickerDialog, EmojiCatalog, EmojiPickerDialog,
 │   │                   #   OverflowMenu, AttachmentPreviewList,
@@ -178,7 +194,8 @@ app/src/main/java/ru/maxgog/pagebook/
 │   ├── calendar/       # CalendarScreen, AddEventDialog, DateTimePickerDialog,
 │   │                   #   EventItem, CalendarViewModel
 │   ├── settings/       # SettingsScreen, SettingsViewModel, AppLanguage,
-│   │                   #   ThemePreference, LanguagePreference, SettingsGroup
+│   │                   #   ThemePreference, LanguagePreference, SettingsGroup,
+│   │                   #   FursonaEasterEgg
 │   └── theme/          # Color, Type, Theme, AppTheme (enum ThemeMode)
 ├── Converters.kt
 ├── PageBookApplication.kt
@@ -192,63 +209,17 @@ app/src/main/java/ru/maxgog/pagebook/
 | **Notes** 📝       | Rich-text заметки, адаптивная сетка, ML Kit для извлечения дат, **теги с эмодзи**, **вложения (фото + файлы)** | Compose, Room, RichEditor, ML Kit, PhotoPicker |
 | **Tasks** ✅       | Задачи с напоминаниями, связь с заметками (`noteId`), сортировка, **теги с эмодзи**, **вложения**              | Compose, StateFlow, Room                       |
 | **Calendar** 🗓️    | События по датам, реактивное обновление, автоскролл, **теги с эмодзи**                                         | Compose, kizitonwose Calendar, Room            |
-| **Settings** ⚙️    | Тема (System/Light/Dark), язык (ru/en) через AppCompatDelegate                                                 | Compose, DataStore, AppCompat                  |
+| **Settings** ⚙️    | Тема (System/Light/Dark), язык (ru/en), **пасхалка с фурсоной**, **аватар разработчика**                       | Compose, DataStore, AppCompat                  |
+| **Notifications** 🔔 | Глобальные уведомления (SUCCESS/ERROR/INFO/EASTER_EGG) с аватаром-фурсоной, выходящим за края `Snackbar`     | Compose, Channel, Hilt                         |
 | **Tags** 🏷️        | Сквозные теги: 7 цветов macOS + **200+ эмодзи** в 10 категориях                                                | Room (@Relation + @Junction), Hilt             |
 | **Attachments** 📎 | App-private storage + MediaStore, Photo Picker, `@Update` для pending, `<img>` в rich-text                     | Room, ContentResolver, LocalImageLoader        |
 
-## 🏷️ Система тегов
+## 🔔 Система уведомлений
 
-Теги — **сквозная фича** приложения. Один тег может быть привязан
-к заметке, задаче и событию одновременно. Каждый тег кастомизируется
-цветом и эмодзи.
-
-| Слой       | Компоненты                                                                                                                                   |
-|:-----------|:---------------------------------------------------------------------------------------------------------------------------------------------|
-| **Domain** | `Tag` (id, name, colorHex, **emoji: String?**), `TagColor` (7 цветов macOS), 10 Use Cases в `usecase/tag/`                                   |
-| **Data**   | `TagModel` (+ колонка `Emoji`), 3 junction-таблицы (`NoteTagCrossRef`, `TaskTagCrossRef`, `EventTagCrossRef`), `TagDao`, `TagRepositoryImpl` |
-| **UI**     | `TagChip`, `CompactTagChip`, `CreateTagDialog`, `TagPickerDialog`, **`EmojiCatalog`** (200+ эмодзи), **`EmojiPickerDialog`**                 |
-
-### Кастомизация тега
-
-| Параметр     | Варианты                                                                                                                | Где задаётся        |
-|:-------------|:------------------------------------------------------------------------------------------------------------------------|:--------------------|
-| **Цвет**     | 7 цветов: 🔴 Красный · 🟠 Оранжевый · 🟡 Жёлтый · 🟢 Зелёный · 🔵 Синий · 🟣 Фиолетовый · ⚫ Серый                      | `CreateTagDialog`   |
-| **Эмодзи**   | 200+ эмодзи в 10 категориях (Смайлы, Работа, Идеи, Учёба, Дом, Еда, Природа, Спорт, Путешествия, Символы) — опционально | `EmojiPickerDialog` |
-| **Название** | любая строка (trim, непустая)                                                                                           | `CreateTagDialog`   |
-
-**Отображение:**
-- **`TagChip`** (редакторы, picker) — если эмодзи задан, показывается вместо цветной точки в `leadingIcon`.
-- **`CompactTagChip`** (карточки в списках) — эмодзи идёт перед названием: `"🎯 Цели"`.
-
-## 📎 Подсистема вложений
-
-| Слой       | Компоненты                                                                                                                                     |
-|:-----------|:-----------------------------------------------------------------------------------------------------------------------------------------------|
-| **Domain** | `Attachment`, `AttachmentType` (`IMAGE`/`VIDEO`/`AUDIO`/`FILE`), `OwnerType` (`NOTE`/`TASK`), `AttachmentRepository`, 4 Use Case               |
-| **Data**   | `AttachmentEntity` (Room, `version = 4`), `AttachmentDao` (+ `@Update`), `AttachmentFileStore` (app-private), `MediaStoreDownloader` (экспорт) |
-| **UI**     | `AttachmentPreviewList`, `AttachmentImageLoader` (для `<img>` в rich-text), `rememberPhotoPicker`, `rememberFilePicker`, `ResizeImageDialog`   |
-
-### ⚠️ Важная особенность: `localPath` — относительный
-
-`AttachmentFileStore.save()` возвращает **относительный** путь
-(`"<uuid>.<ext>"`), а не абсолютный. Читать файл нужно так:
-
-```kotlin
-val file = File(File(context.filesDir, "attachments"), attachment.localPath)
-```
-
-Это правило обязательно для:
-- `AttachmentPreviewList` (превью в редакторах),
-- `AttachmentImageLoader` (картинки внутри rich-text),
-- любого нового кода, который читает `localPath`.
-
-### Pending-вложения
-
-Для **новой** (ещё не сохранённой) заметки/задачи файл сохраняется сразу
-с `ownerId = 0`. После `save*` запись **обновляется** через
-`attachmentRepository.updateAttachment(pending.copy(ownerId = savedId))` —
-повторный `insertAttachment` приведёт к `SQLiteConstraintException`
-(у `pending` уже есть `id`).
+Мы отказались от локальных `SnackbarHost` на каждом экране в пользу единого глобального менеджера:
+- **`AppNotificationManager`** (`@Singleton`) — инжектится в ViewModel и позволяет отправлять сообщения через `notificationManager.success(R.string...)` или `.error(...)`.
+- **`FursonaSnackbar`** — кастомный UI, реализованный через `Box` + `Surface`. Фурсона позиционируется `BottomStart` с отрицательным `offset`, что позволяет ей красиво выглядывать за пределы плашки, не перекрывая текст.
+- **`AppNotificationHost`** — вешается один раз в `MainActivity`, собирает события из `Channel` и отображает их с помощью `SnackbarHostState`.
 
 ## 🛠 Разработка
 
@@ -294,6 +265,8 @@ val file = File(File(context.filesDir, "attachments"), attachment.localPath)
 - [x] **Смена языка** через `AppCompatDelegate` (единый источник правды)
 - [x] **One-Shot Events** через `Channel` для навигации
 - [x] **Вложения** для Notes и Tasks (фото + файлы, MediaStore-экспорт, pending)
+- [x] **Глобальная система уведомлений** (кастомный `Snackbar` с фурсоной)
+- [x] **Пасхалка** (7 тапов по версии) и аватар разработчика в настройках
 - [ ] **Смена языка на Android < 13** (требуется `AppCompatActivity`)
 - [ ] **Фильтрация списков по тегам** в Notes / Tasks / Calendar
 - [ ] **Редактирование существующих тегов** (имя/цвет/эмодзи)

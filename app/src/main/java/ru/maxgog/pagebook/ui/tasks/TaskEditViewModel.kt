@@ -15,21 +15,12 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.maxgog.pagebook.R
-import ru.maxgog.pagebook.domain.model.Attachment
-import ru.maxgog.pagebook.domain.model.OwnerType
-import ru.maxgog.pagebook.domain.model.Tag
-import ru.maxgog.pagebook.domain.model.TagColor
-import ru.maxgog.pagebook.domain.model.Task
+import ru.maxgog.pagebook.core.notification.AppNotificationManager
+import ru.maxgog.pagebook.domain.model.*
 import ru.maxgog.pagebook.domain.repository.AttachmentRepository
 import ru.maxgog.pagebook.domain.repository.TagRepository
-import ru.maxgog.pagebook.domain.usecase.attachment.DeleteAttachmentUseCase
-import ru.maxgog.pagebook.domain.usecase.attachment.DownloadAttachmentUseCase
-import ru.maxgog.pagebook.domain.usecase.attachment.GetAttachmentsForTaskUseCase
-import ru.maxgog.pagebook.domain.usecase.attachment.SaveAttachmentUseCase
-import ru.maxgog.pagebook.domain.usecase.tag.CreateTagUseCase
-import ru.maxgog.pagebook.domain.usecase.tag.GetAllTagsUseCase
-import ru.maxgog.pagebook.domain.usecase.tag.GetTagsForTaskUseCase
-import ru.maxgog.pagebook.domain.usecase.tag.ToggleTagOnTaskUseCase
+import ru.maxgog.pagebook.domain.usecase.attachment.*
+import ru.maxgog.pagebook.domain.usecase.tag.*
 import ru.maxgog.pagebook.domain.usecase.task.DeleteTaskUseCase
 import ru.maxgog.pagebook.domain.usecase.task.GetTaskByIdUseCase
 import ru.maxgog.pagebook.domain.usecase.task.SaveTaskUseCase
@@ -50,7 +41,8 @@ class TaskEditViewModel @Inject constructor(
     private val getAttachmentsForTask: GetAttachmentsForTaskUseCase,
     private val deleteAttachment: DeleteAttachmentUseCase,
     private val downloadAttachmentUseCase: DownloadAttachmentUseCase,
-    private val attachmentRepository: AttachmentRepository
+    private val attachmentRepository: AttachmentRepository,
+    private val notificationManager: AppNotificationManager
 ) : ViewModel() {
 
     private var taskId: Int? = savedStateHandle.get<Int>("taskId")?.takeIf { it != 0 }
@@ -60,9 +52,6 @@ class TaskEditViewModel @Inject constructor(
 
     private val _events = Channel<TaskEditEvent>(Channel.BUFFERED)
     val events = _events.receiveAsFlow()
-
-    private val _snackbarMessageRes = MutableStateFlow<Int?>(null)
-    val snackbarMessageRes: StateFlow<Int?> = _snackbarMessageRes.asStateFlow()
 
     val allTags: StateFlow<List<Tag>> = getAllTags()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -112,9 +101,7 @@ class TaskEditViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 when (val current = _uiState.value) {
-                    is TaskEditUiState.Editing -> {
-                        saveAttachment(uri, OwnerType.TASK, current.task.id)
-                    }
+                    is TaskEditUiState.Editing -> saveAttachment(uri, OwnerType.TASK, current.task.id)
                     is TaskEditUiState.NewTask -> {
                         val pending = saveAttachment(uri, OwnerType.TASK, 0)
                         _uiState.value = current.copy(
@@ -125,7 +112,7 @@ class TaskEditViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "attachUri failed", e)
-                _snackbarMessageRes.value = R.string.attachment_save_error
+                notificationManager.error(R.string.attachment_save_error)
             }
         }
     }
@@ -133,9 +120,7 @@ class TaskEditViewModel @Inject constructor(
     fun removeAttachment(attachment: Attachment) {
         val current = _uiState.value
         when (current) {
-            is TaskEditUiState.Editing -> viewModelScope.launch {
-                deleteAttachment(attachment)
-            }
+            is TaskEditUiState.Editing -> viewModelScope.launch { deleteAttachment(attachment) }
             is TaskEditUiState.NewTask -> viewModelScope.launch {
                 deleteAttachment(attachment)
                 _uiState.value = current.copy(
@@ -150,16 +135,12 @@ class TaskEditViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 downloadAttachmentUseCase(attachment)
-                _snackbarMessageRes.value = R.string.downloaded
+                notificationManager.success(R.string.downloaded)
             } catch (e: Exception) {
                 Log.e(TAG, "downloadAttachment failed", e)
-                _snackbarMessageRes.value = R.string.download_error
+                notificationManager.error(R.string.download_error)
             }
         }
-    }
-
-    fun clearSnackbar() {
-        _snackbarMessageRes.value = null
     }
 
     fun toggleTag(tag: Tag) {
@@ -208,25 +189,22 @@ class TaskEditViewModel @Inject constructor(
 
             try {
                 val savedId = saveTask(task)
-
                 if (current is TaskEditUiState.NewTask) {
                     current.selectedTags.forEach { tag ->
                         tagRepository.addTagToTask(savedId.toInt(), tag.id)
                     }
-                    // Pending-вложения уже в БД (id != 0, ownerId = 0)
-                    // → UPDATE, а не повторный INSERT.
                     current.pendingAttachments.forEach { pending ->
                         attachmentRepository.updateAttachment(
                             pending.copy(ownerId = savedId.toInt())
                         )
                     }
                 }
-
                 saved = true
+                notificationManager.success(R.string.task_saved)
                 _events.send(TaskEditEvent.Saved)
             } catch (e: Exception) {
                 Log.e(TAG, "save task failed", e)
-                _snackbarMessageRes.value = R.string.unknown_error
+                notificationManager.error(R.string.unknown_error)
             }
         }
     }
@@ -237,6 +215,7 @@ class TaskEditViewModel @Inject constructor(
             viewModelScope.launch {
                 current.attachments.forEach { deleteAttachment(it) }
                 deleteTask(current.task)
+                notificationManager.success(R.string.task_deleted)
                 _events.send(TaskEditEvent.Deleted)
             }
         }

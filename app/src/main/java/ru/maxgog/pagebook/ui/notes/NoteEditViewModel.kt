@@ -15,11 +15,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.maxgog.pagebook.R
-import ru.maxgog.pagebook.domain.model.Attachment
-import ru.maxgog.pagebook.domain.model.Note
-import ru.maxgog.pagebook.domain.model.OwnerType
-import ru.maxgog.pagebook.domain.model.Tag
-import ru.maxgog.pagebook.domain.model.TagColor
+import ru.maxgog.pagebook.core.notification.AppNotificationManager
+import ru.maxgog.pagebook.domain.model.*
 import ru.maxgog.pagebook.domain.repository.AttachmentRepository
 import ru.maxgog.pagebook.domain.repository.TagRepository
 import ru.maxgog.pagebook.domain.usecase.attachment.DeleteAttachmentUseCase
@@ -29,10 +26,7 @@ import ru.maxgog.pagebook.domain.usecase.attachment.SaveAttachmentUseCase
 import ru.maxgog.pagebook.domain.usecase.note.DeleteNoteUseCase
 import ru.maxgog.pagebook.domain.usecase.note.GetNoteByIdUseCase
 import ru.maxgog.pagebook.domain.usecase.note.SaveNoteUseCase
-import ru.maxgog.pagebook.domain.usecase.tag.CreateTagUseCase
-import ru.maxgog.pagebook.domain.usecase.tag.GetAllTagsUseCase
-import ru.maxgog.pagebook.domain.usecase.tag.GetTagsForNoteUseCase
-import ru.maxgog.pagebook.domain.usecase.tag.ToggleTagOnNoteUseCase
+import ru.maxgog.pagebook.domain.usecase.tag.*
 import ru.maxgog.pagebook.domain.usecase.task.CreateTaskFromNoteUseCase
 import ru.maxgog.pagebook.domain.usecase.task.SaveTaskUseCase
 import javax.inject.Inject
@@ -54,7 +48,8 @@ class NoteEditViewModel @Inject constructor(
     private val getAttachmentsForNote: GetAttachmentsForNoteUseCase,
     private val deleteAttachment: DeleteAttachmentUseCase,
     private val downloadAttachment: DownloadAttachmentUseCase,
-    private val attachmentRepository: AttachmentRepository
+    private val attachmentRepository: AttachmentRepository,
+    private val notificationManager: AppNotificationManager
 ) : ViewModel() {
 
     private val noteId: Int? = savedStateHandle.get<Int>("noteId")
@@ -67,9 +62,6 @@ class NoteEditViewModel @Inject constructor(
 
     private val _taskCreating = MutableStateFlow(false)
     val taskCreating: StateFlow<Boolean> = _taskCreating.asStateFlow()
-
-    private val _snackbarMessageRes = MutableStateFlow<Int?>(null)
-    val snackbarMessageRes: StateFlow<Int?> = _snackbarMessageRes.asStateFlow()
 
     val allTags: StateFlow<List<Tag>> = getAllTags()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -135,11 +127,8 @@ class NoteEditViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 when (val current = _uiState.value) {
-                    is NoteEditUiState.Editing -> {
-                        saveAttachment(uri, OwnerType.NOTE, current.note.id)
-                    }
+                    is NoteEditUiState.Editing -> saveAttachment(uri, OwnerType.NOTE, current.note.id)
                     is NoteEditUiState.NewNote -> {
-                        // ownerId = 0 → pending, привяжем при save
                         val pending = saveAttachment(uri, OwnerType.NOTE, 0)
                         _uiState.value = current.copy(
                             pendingAttachments = current.pendingAttachments + pending
@@ -149,7 +138,7 @@ class NoteEditViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "attachUri failed", e)
-                _snackbarMessageRes.value = R.string.attachment_save_error
+                notificationManager.error(R.string.attachment_save_error)
             }
         }
     }
@@ -176,10 +165,10 @@ class NoteEditViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 downloadAttachment.invoke(attachment)
-                _snackbarMessageRes.value = R.string.downloaded
+                notificationManager.success(R.string.downloaded)
             } catch (e: Exception) {
                 Log.e(TAG, "downloadAttachment failed", e)
-                _snackbarMessageRes.value = R.string.download_error
+                notificationManager.error(R.string.download_error)
             }
         }
     }
@@ -205,10 +194,11 @@ class NoteEditViewModel @Inject constructor(
                     }
                 }
                 saved = true
+                notificationManager.success(R.string.note_saved)
                 _events.send(NoteEditEvent.Saved)
             } catch (e: Exception) {
                 Log.e(TAG, "save note failed", e)
-                _snackbarMessageRes.value = R.string.unknown_error
+                notificationManager.error(R.string.unknown_error)
             }
         }
     }
@@ -219,6 +209,7 @@ class NoteEditViewModel @Inject constructor(
             viewModelScope.launch {
                 current.attachments.forEach { deleteAttachment(it) }
                 deleteNote(current.note)
+                notificationManager.success(R.string.note_deleted)
                 _events.send(NoteEditEvent.Deleted)
             }
         }
@@ -234,19 +225,18 @@ class NoteEditViewModel @Inject constructor(
                     noteTitle = current.note.title
                 )
                 saveTask(task.copy(noteId = current.note.id))
-                _snackbarMessageRes.value = if (task.hasReminder)
-                    R.string.task_created_with_reminder else R.string.task_created
+                if (task.hasReminder) {
+                    notificationManager.success(R.string.task_created_with_reminder)
+                } else {
+                    notificationManager.success(R.string.task_created)
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "createTask failed", e)
-                _snackbarMessageRes.value = R.string.task_creation_error
+                notificationManager.error(R.string.task_creation_error)
             } finally {
                 _taskCreating.value = false
             }
         }
-    }
-
-    fun clearSnackbar() {
-        _snackbarMessageRes.value = null
     }
 
     override fun onCleared() {

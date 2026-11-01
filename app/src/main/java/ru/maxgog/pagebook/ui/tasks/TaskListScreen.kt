@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.maxgog.pagebook.R
-import ru.maxgog.pagebook.ui.EmptyState
+import ru.maxgog.pagebook.ui.app.EmptyState
 import ru.maxgog.pagebook.ui.components.OverflowMenu
 
 @OptIn(ExperimentalMaterial3Api::class)

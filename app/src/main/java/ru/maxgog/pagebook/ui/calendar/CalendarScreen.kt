@@ -27,7 +27,7 @@ import com.kizitonwose.calendar.core.CalendarDay
 import ru.maxgog.pagebook.R
 import ru.maxgog.pagebook.domain.model.Event
 import ru.maxgog.pagebook.toKotlinxLocalDate
-import ru.maxgog.pagebook.ui.EmptyState
+import ru.maxgog.pagebook.ui.app.EmptyState
 import ru.maxgog.pagebook.ui.components.OverflowMenu
 import ru.maxgog.pagebook.ui.theme.AppTheme
 import java.time.YearMonth

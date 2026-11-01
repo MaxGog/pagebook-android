@@ -43,10 +43,8 @@ fun NoteEditScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val allTags by viewModel.allTags.collectAsStateWithLifecycle()
     val taskCreating by viewModel.taskCreating.collectAsStateWithLifecycle()
-    val snackbarMessageRes by viewModel.snackbarMessageRes.collectAsStateWithLifecycle()
     val richTextState = rememberRichTextState()
 
-    val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
     val pickImage = rememberPhotoPicker { uri ->
@@ -83,13 +81,6 @@ fun NoteEditScreen(
             when (event) {
                 NoteEditEvent.Saved, NoteEditEvent.Deleted -> onBack()
             }
-        }
-    }
-
-    LaunchedEffect(snackbarMessageRes) {
-        snackbarMessageRes?.let { resId ->
-            snackbarHostState.showSnackbar(context.getString(resId))
-            viewModel.clearSnackbar()
         }
     }
 
@@ -166,7 +157,6 @@ fun NoteEditScreen(
                 )
             },
             bottomBar = { FormattingToolbar(state = richTextState) },
-            snackbarHost = { SnackbarHost(snackbarHostState) },
             contentWindowInsets = WindowInsets(0)
         ) { padding ->
             when {

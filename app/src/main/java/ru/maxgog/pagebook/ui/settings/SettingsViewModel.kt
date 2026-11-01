@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.maxgog.pagebook.BuildConfig
+import ru.maxgog.pagebook.R
+import ru.maxgog.pagebook.core.notification.AppNotificationManager
 import ru.maxgog.pagebook.data.repository.SettingsRepository
 import ru.maxgog.pagebook.ui.theme.AppTheme
 import javax.inject.Inject
@@ -22,7 +24,8 @@ data class SettingsUiState(
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val notificationManager: AppNotificationManager
 ) : ViewModel() {
 
     private val _language = MutableStateFlow(AppLanguage.current())
@@ -49,5 +52,10 @@ class SettingsViewModel @Inject constructor(
     fun setLanguage(language: AppLanguage) {
         _language.value = language
         AppLanguage.apply(language)
+        notificationManager.success(R.string.language_applied)
+    }
+
+    fun onFursonaEasterEggFound() {
+        notificationManager.easterEgg(R.string.fursona_easter_egg_found)
     }
 }

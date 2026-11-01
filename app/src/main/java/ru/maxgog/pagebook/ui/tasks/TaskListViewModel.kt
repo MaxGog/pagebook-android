@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import ru.maxgog.pagebook.R
+import ru.maxgog.pagebook.core.notification.AppNotificationManager
 import ru.maxgog.pagebook.domain.model.Task
 import ru.maxgog.pagebook.domain.usecase.task.DeleteTaskUseCase
 import ru.maxgog.pagebook.domain.usecase.task.GetAllTasksUseCase
@@ -19,7 +21,8 @@ import javax.inject.Inject
 class TaskListViewModel @Inject constructor(
     getAllTasks: GetAllTasksUseCase,
     private val saveTask: SaveTaskUseCase,
-    private val deleteTask: DeleteTaskUseCase
+    private val deleteTask: DeleteTaskUseCase,
+    private val notificationManager: AppNotificationManager
 ) : ViewModel() {
 
     val uiState: StateFlow<TaskListUiState> = getAllTasks()
@@ -32,6 +35,13 @@ class TaskListViewModel @Inject constructor(
     }
 
     fun delete(task: Task) {
-        viewModelScope.launch { deleteTask(task) }
+        viewModelScope.launch {
+            try {
+                deleteTask(task)
+                notificationManager.success(R.string.task_deleted)
+            } catch (e: Exception) {
+                notificationManager.error(R.string.unknown_error)
+            }
+        }
     }
 }

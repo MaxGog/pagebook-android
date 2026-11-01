@@ -20,10 +20,11 @@ PageBook Android следует официальным рекомендация�
 > **Статус миграции:** Clean Architecture полностью внедрена для всех трёх
 > модулей — **Notes**, **Tasks** и **Events (Calendar)**. Все три БД объединены
 > в одну `PageBookDatabase` (version 4). Добавлена сквозная система
-> **тегов с кастомизацией цвета и эмодзи**, а также **подсистема вложений**
+> **тегов с кастомизацией цвета и эмодзи**, **подсистема вложений**
 > (изображения + файлы, хранятся в app-private storage, скачиваются через
-> MediaStore). UI переведён на Material 3 Expressive, локализован на
-> `ru`/`en`, добавлена адаптивность под планшеты.
+> MediaStore), а также **глобальная система уведомлений** (кастомный `Snackbar`
+> с аватаром-фурсоной) и **пасхалка** в настройках. UI переведён на Material 3 Expressive,
+> локализован на `ru`/`en`, добавлена адаптивность под планшеты.
 
 ## 🛠 Технологический стек
 
@@ -53,6 +54,10 @@ ru.maxgog.pagebook
 ├── MainActivity.kt               # AppCompatActivity + enableEdgeToEdge() + setContent
 ├── Converters.kt                 # LocalDate ↔ String
 │
+├── core/
+│   └── notification/             # AppNotification, AppNotificationManager,
+│                                 #   AppNotificationType (SUCCESS/ERROR/INFO/EASTER_EGG)
+│
 ├── data/
 │   ├── dao/                      # NoteDao, TaskDao, EventDao, TagDao
 │   ├── local/                    # AttachmentDao, AttachmentEntity
@@ -72,8 +77,11 @@ ru.maxgog.pagebook
 │   └── usecase/                  # note/, task/, event/, tag/, attachment/
 │
 └── ui/
-    ├── app/                      # CombinedApp — NavigationSuiteScaffold
+    ├── app/                      # CombinedApp — NavigationSuiteScaffold,
+    │                             #   MainViewModel (провайдер AppNotificationManager)
     ├── navigation/               # Destinations.kt, AppNavHost.kt, BottomNavBar.kt
+    ├── notification/             # AppNotificationHost, FursonaSnackbar,
+    │                             #   FursonaSnackbarVisuals
     ├── components/               # TagChip, CompactTagChip, CreateTagDialog,
     │                             #   TagPickerDialog, EmojiCatalog, EmojiPickerDialog,
     │                             #   OverflowMenu, AttachmentPreviewList,
@@ -84,7 +92,8 @@ ru.maxgog.pagebook
     │                             #   TaskListDetailPane + ViewModels + UiStates
     ├── calendar/                 # CalendarScreen, AddEventDialog, EventItem + ViewModel
     ├── settings/                 # SettingsScreen, SettingsViewModel, AppLanguage,
-    │                             #   ThemePreference, LanguagePreference, SettingsGroup
+    │                             #   ThemePreference, LanguagePreference, SettingsGroup,
+    │                             #   FursonaEasterEgg (пасхалка)
     └── theme/                    # Color, Type, Theme, AppTheme (enum ThemeMode)
 ```
 
@@ -140,14 +149,6 @@ abstract class PageBookDatabase : RoomDatabase() {
 плодить отдельные таблицы и один и тот же UI-компонент
 (`AttachmentPreviewList`) переиспользовать в обоих редакторах.
 
-### Слои
-
-| Слой       | Компоненты                                                                                                                                                                |
-|:-----------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Domain** | `Attachment` (`id`, `ownerType`, `ownerId`, `type`, `localPath`, `mimeType`, `displayName`, `sizeBytes`, `createdAt`), `AttachmentType` (`IMAGE`/`VIDEO`/`AUDIO`/`FILE`), `OwnerType` (`NOTE`/`TASK`), `AttachmentRepository`, 4 Use Case (`Save`, `Get*For*`, `Delete`, `Download`) |
-| **Data**   | `AttachmentEntity` (Room, `version = 4`), `AttachmentDao`, `AttachmentMapper`, `AttachmentRepositoryImpl`, `AttachmentFileStore` (app-private storage), `MediaStoreDownloader` (экспорт в `Pictures`/`Downloads`) |
-| **UI**     | `AttachmentPreviewList` (сетка превью + файловые чипы), `AttachmentImageLoader` (`LocalImageLoader` для RichEditor), `rememberPhotoPicker`, `rememberFilePicker`, `ResizeImageDialog` |
-
 ### ⚠️ Ключевая особенность: `localPath` — относительный
 
 `AttachmentFileStore.save()` кладёт файл в `filesDir/attachments/<uuid>.<ext>`
@@ -163,40 +164,33 @@ val file = File(File(context.filesDir, "attachments"), attachment.localPath)
 val file = File(attachment.localPath)
 ```
 
-Это правило касается:
-- `AttachmentPreviewList.kt` (превью в редакторах);
-- `AttachmentImageLoader.kt` (`<img src="localPath">` внутри rich-text);
-- `AttachmentFileStore.open()` (единственное место, которое уже разрешало правильно).
+Это правило касается `AttachmentPreviewList.kt`, `AttachmentImageLoader.kt` и `AttachmentFileStore.open()`.
 
-### ⚠️ Pending-вложения новых сущностей
+## 🔔 Глобальная система уведомлений (Snackbar)
 
-При создании **новой** заметки/задачи вложения сохраняются с
-`ownerId = 0` (pending). После `save*` они **обновляются** (`@Update`), а не
-вставляются повторно:
+В приложении реализована **единая точка показа уведомлений**, избавляющая ViewModel от привязки к `Context` и предотвращающая дублирование `SnackbarHost` на каждом экране.
 
+### Архитектура
+1. **`AppNotificationManager`** (`@Singleton`, Hilt) — единый менеджер. Использует `Channel<AppNotification>(BUFFERED)` для гарантированной доставки (по принципу One-Shot событий).
+2. **`MainActivity`** — единственное место, где инициализируется `SnackbarHostState` и вызывается `AppNotificationHost`. Он подписывается на `events` менеджера и передаёт их в кастомный `SnackbarHost`.
+3. **`FursonaSnackbar`** — кастомный UI. Использует `FursonaSnackbarVisuals` для получения типа уведомления (`SUCCESS`, `ERROR`, `INFO`, `EASTER_EGG`).
+
+### 🦊 Особенности дизайна фурсоны
+- Фурсона вынесена за пределы фона `Snackbar` (реализовано через `Box` + `Surface` с отступом).
+- Используются цвета Material 3 (`secondaryContainer` для успеха, `errorContainer` для ошибок, `tertiaryContainer` для пасхалок).
+
+### Использование в ViewModel
 ```kotlin
-// NoteEditViewModel.save() / TaskEditViewModel.save()
-current.pendingAttachments.forEach { pending ->
-    attachmentRepository.updateAttachment(pending.copy(ownerId = savedId.toInt()))
+@HiltViewModel
+class NoteEditViewModel @Inject constructor(
+    private val notificationManager: AppNotificationManager
+) : ViewModel() {
+    fun save() {
+        // ...
+        notificationManager.success(R.string.note_saved)
+    }
 }
 ```
-
-Повторный `insertAttachment` **нельзя** — `pending.id != 0`, и Room бросит
-`SQLiteConstraintException` (что раньше маскировалось пустым `catch`).
-
-### Очистка pending-вложений
-
-Если пользователь выбрал файл в новой заметке, но ушёл назад без
-сохранения — `onCleared()` ViewModel удаляет `pendingAttachments` через
-`GlobalScope` (файл + запись в БД). Иначе накапливаются «сироты».
-
-### Экспорт во внешнее хранилище
-
-`MediaStoreDownloader.download()` использует `ContentResolver.insert()`
-с `MediaStore.Images/Video/Audio/Downloads`. Файл читается из app-private
-storage и копируется в общедоступную коллекцию. На Android Q+ требуется
-только `RELATIVE_PATH` для `Downloads`; для медиа `RELATIVE_PATH`
-выставляется автоматически системой.
 
 ## 🎨 Адаптивный UI и навигация
 
@@ -223,8 +217,7 @@ storage и копируется в общедоступную коллекцию
 
 Для навигации после сохранения/удаления вместо `StateFlow<Boolean>`
 используется `Channel<T>(Channel.BUFFERED)` + `receiveAsFlow()`.
-Это гарантирует доставку события **ровно один раз** и устраняет race condition
-(когда экран закрывается до завершения корутины).
+Это гарантирует доставку события **ровно один раз** и устраняет race condition.
 
 ```kotlin
 // ViewModel
@@ -245,13 +238,17 @@ LaunchedEffect(Unit) {
 
 Настройки разделены на две зоны ответственности:
 1.  **Тема** — хранится в `DataStore<Preferences>` (`SettingsRepository`). Читается через `ThemeViewModel` в `MainActivity` (реактивно).
-2.  **Язык** — единый источник правды `AppCompatDelegate.getApplicationLocales()`. `SettingsRepository` **не хранит язык**. Выбор применяется через `AppLanguage.apply()`.
+2.  **Язык** — единый источник правды `AppCompatDelegate.getApplicationLocales()`. Выбор применяется через `AppLanguage.apply()`.
 
 ### UI в стиле Material 3 Expressive
 - Группы настроек обёрнуты в `Card` с `RoundedCornerShape(28.dp)`.
 - Внутри — `ListItem` с `Color.Transparent`.
 - Под каждым пунктом — `supportingContent` с пояснением (`theme_system_desc`, `language_ru_desc` и т.д.).
 - В `TopAppBar` всех главных экранов добавлено `OverflowMenu` (три точки) с пунктом «Настройки».
+
+### 🥚 Пасхалка и аватар разработчика
+- **Аватар разработчика**: добавлен в `AboutSettings` через `leadingContent` у `ListItem`.
+- **Пасхалка**: при 7 быстрых тапах (с паузой не более 1 сек) по номеру версии появляется карточка `FursonaEasterEgg` с анимацией, а также отправляется `EASTER_EGG`-уведомление.
 
 ## 🔄 Поток данных (примеры)
 
@@ -263,6 +260,7 @@ sequenceDiagram
     participant UC as CreateTaskFromNoteUseCase
     participant ML as ML Kit
     participant Save as SaveTaskUseCase
+    participant NM as AppNotificationManager
 
     UI->>VM: createTaskFromCurrentNote()
     VM->>UC: invoke(noteContent, noteTitle)
@@ -271,12 +269,11 @@ sequenceDiagram
     UC->>UC: filter { > now }.minOrNull()
     UC-->>VM: Task(..., reminderTime)
     VM->>Save: invoke(task.copy(noteId = ...))
-    VM->>VM: _snackbarMessageRes.value = R.string.task_created
-    VM-->>UI: LaunchedEffect(snackbarMessageRes) → showSnackbar
+    VM->>NM: notificationManager.success(R.string.task_created)
+    NM-->>UI: AppNotificationHost → FursonaSnackbar
 ```
 
 ### Прикрепление файла к новой заметке
-
 ```mermaid
 sequenceDiagram
     participant UI as NoteEditScreen
@@ -302,23 +299,6 @@ sequenceDiagram
     Note over DB: UPDATE, а не INSERT (иначе SQLiteConstraintException)
 ```
 
-### Смена языка
-```mermaid
-sequenceDiagram
-    participant UI as LanguagePreference
-    participant VM as SettingsViewModel
-    participant AL as AppLanguage
-    participant AD as AppCompatDelegate
-    participant OS as Android OS
-
-    UI->>VM: setLanguage(AppLanguage.ENGLISH)
-    VM->>VM: _language.value = ENGLISH
-    VM->>AL: apply(ENGLISH)
-    AL->>AD: setApplicationLocales("en")
-    AD->>OS: сохранить локаль (LocaleManager / SharedPreferences)
-    OS-->>AD: пересоздать Activity (или обновить конфигурацию)
-```
-
 ## 🧭 Ключевые архитектурные решения
 
 | Решение                                                                      | Обоснование                                                                |
@@ -327,6 +307,7 @@ sequenceDiagram
 | **Repository как интерфейс**                                                 | Позволяет подменить источник данных без изменения Domain/UI.               |
 | **UI State (sealed / data class)**                                           | Явные состояния `Loading`/`Success`/`Error` — предсказуемое поведение.     |
 | **One-Shot Events (`Channel`)**                                              | Гарантирует однократный вызов `onBack()` после сохранения.                 |
+| **Глобальный `SnackbarHost` + `Channel`**                                    | Избавляет ViewModel от `Context`, гарантирует доставку, убирает дублирование `SnackbarHost` на каждом экране. |
 | **Hilt**                                                                     | Масштабируемый DI, генерируемый на этапе компиляции.                       |
 | **Type-safe navigation**                                                     | Компилятор проверяет маршруты и аргументы.                                 |
 | **`AppCompatDelegate` для языка**                                            | Единый источник правды, работающий на всех версиях Android.                |
@@ -336,6 +317,7 @@ sequenceDiagram
 | **Адаптивные лейауты (`NavigationSuiteScaffold`, `ListDetailPaneScaffold`)** | Соответствие гайдлайнам Google для телефонов, планшетов и Chromebook.      |
 | **M3 Expressive (`Card`, `ListItem`)**                                       | Современный вид без alpha-зависимостей.                                    |
 | **`@StringRes` в ViewModel**                                                 | Snackbar-сообщения локализуются без утечек `Context`.                      |
+| **Кастомный `Snackbar` с фурсоной**                                          | Единый стиль уведомлений, брендинг, M3 Expressive (`Surface` + `Box` для выхода за рамки). |
 
 ## 🚀 Планы по развитию
 
@@ -349,6 +331,8 @@ sequenceDiagram
 - [x] Починить смену языка через **`AppCompatDelegate`**.
 - [x] Добавить **One-Shot Events** через `Channel`.
 - [x] Добавить **подсистему вложений** (изображения + файлы, общая для Notes и Tasks).
+- [x] Внедрить **глобальную систему уведомлений** с фурсоной (`AppNotificationManager` + `FursonaSnackbar`).
+- [x] Добавить **пасхалку** и аватар разработчика в настройки.
 - [ ] Фильтрация списков по тегам (Notes / Tasks / Calendar).
 - [ ] Редактирование существующих тегов (имя/цвет/эмодзи) в UI.
 - [ ] Поиск по эмодзи в `EmojiPickerDialog`.

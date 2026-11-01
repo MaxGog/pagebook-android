@@ -1,4 +1,4 @@
-package ru.maxgog.pagebook.ui
+package ru.maxgog.pagebook.ui.app
 
 import android.graphics.BitmapFactory
 import androidx.compose.runtime.Composable

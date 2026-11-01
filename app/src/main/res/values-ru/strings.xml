@@ -119,4 +119,23 @@
     <string name="download_error">Не удалось сохранить файл</string>
     <string name="resize_image">Размер изображения</string>
     <string name="image_width">Ширина: %1$d sp</string>
+
+    <!-- Notification system -->
+    <string name="notification_dismiss">Закрыть</string>
+    <string name="fursona_avatar_content_description">Фурсона</string>
+    <string name="developer_avatar_content_description">Аватар разработчика</string>
+    <string name="language_applied">Язык изменён</string>
+
+    <!-- Easter egg -->
+    <string name="fursona_easter_egg_found">Ты нашёл фурсону! 🎉</string>
+    <string name="fursona_easter_egg_title">🎉 Пасхалка разблокирована!</string>
+    <string name="fursona_easter_egg_message">Ты нашёл скрытую фурсону. Спасибо за исследование!</string>
+    <string name="fursona_easter_egg_tap_hint">Ещё %1$d нажатий…</string>
+
+    <string name="note_saved">Заметка сохранена</string>
+    <string name="task_saved">Задача сохранена</string>
+    <string name="note_deleted">Заметка удалена</string>
+    <string name="task_deleted">Задача удалена</string>
+    <string name="event_added">Событие добавлено</string>
+    <string name="event_deleted">Событие удалено</string>
 </resources>

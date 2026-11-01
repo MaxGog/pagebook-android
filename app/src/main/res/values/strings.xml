@@ -119,4 +119,23 @@
     <string name="download_error">Could not save file</string>
     <string name="resize_image">Image size</string>
     <string name="image_width">Width: %1$d sp</string>
+
+    <!-- Notification system -->
+    <string name="notification_dismiss">Dismiss</string>
+    <string name="fursona_avatar_content_description">Fursona</string>
+    <string name="developer_avatar_content_description">Developer avatar</string>
+    <string name="language_applied">Language updated</string>
+
+    <!-- Easter egg -->
+    <string name="fursona_easter_egg_found">You found the fursona! 🎉</string>
+    <string name="fursona_easter_egg_title">🎉 Easter egg unlocked!</string>
+    <string name="fursona_easter_egg_message">You found the hidden fursona. Thanks for exploring!</string>
+    <string name="fursona_easter_egg_tap_hint">Tap %1$d more times…</string>
+
+    <string name="note_saved">Note saved</string>
+    <string name="task_saved">Task saved</string>
+    <string name="note_deleted">Note deleted</string>
+    <string name="task_deleted">Task deleted</string>
+    <string name="event_added">Event added</string>
+    <string name="event_deleted">Event deleted</string>
 </resources>

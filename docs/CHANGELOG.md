@@ -230,6 +230,20 @@
   `AttachFile` в `TopAppBar`, `AttachmentPreviewList` под заголовком.
 - **`FormattingToolbar`**: `windowInsetsPadding(navigationBars ∪ ime)` — не уходит под клавиатуру.
 
+  **Notifications**
+- Единая система внутренних уведомлений `AppNotificationManager` (Hilt `@Singleton`)
+  на `Channel` + `SharedFlow`-подобный API (`success/error/info/easterEgg`).
+- Кастомный `FursonaSnackbar` с аватаром-фурсоной и цветовыми типами
+  (SUCCESS/ERROR/INFO/EASTER_EGG) — Material 3 Expressive (`shapes.extraLarge`,
+  `tertiaryContainer` для пасхалки).
+- `AppNotificationHost` — единственная точка подписки в `MainActivity`,
+  гарантирует однократную доставку и прерывает текущий snackbar новым.
+
+**Settings**
+- Пасхалка: 7 тапов по номеру версии открывают карточку с фурсоной
+  + специальное EASTER_EGG-уведомление.
+- Аватар разработчика (`leadingContent`) в `AboutSettings`.
+
 **Документация**
 - `ARCHITECTURE.md`: добавлены разделы «Адаптивный UI», «One-Shot Events»,
   «Настройки (DataStore + AppCompatDelegate)», **«Подсистема вложений (Attachments)»**,
