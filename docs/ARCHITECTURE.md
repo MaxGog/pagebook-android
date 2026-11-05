@@ -25,10 +25,11 @@ PageBook Android следует официальным рекомендация�
 > использования**. Эмодзи-пикер получил **поиск** (по ключевым словам,
 > Unicode-имени и категории) и **секцию недавних** (последние 20 в `DataStore`).
 > Добавлена **подсистема вложений** (изображения + файлы, app-private storage,
-> MediaStore), **глобальная система уведомлений** (кастомный `Snackbar`
-> с аватаром-фурсоной) и **пасхалка** в настройках. UI переведён на
-> Material 3 Expressive, локализован на `ru`/`en`, добавлена адаптивность
-> под планшеты.
+> MediaStore, **системная камера** через `FileProvider`), **fullscreen-просмотр
+> вложений** с pinch-to-zoom (`FullScreenAttachmentViewer`), **глобальная система
+> уведомлений** (кастомный `Snackbar` с аватаром-фурсоной) и **пасхалка** в
+> настройках. UI переведён на Material 3 Expressive, локализован на `ru`/`en`,
+> добавлена адаптивность под планшеты.
 
 ## 🛠 Технологический стек
 
@@ -39,7 +40,8 @@ PageBook Android следует официальным рекомендация�
 | Архитектура         | Clean Architecture (UI/Domain/Data)                           | —              |
 | Локальное хранилище | Room (одна БД `pagebook.db`)                                  | 2.7.2          |
 | Rich text           | RichEditor (Compose Multiplatform)                            | —              |
-| Файловое хранилище  | App-private (`filesDir/attachments/`) + MediaStore (download) | —              |
+| Файловое хранилище  | App-private (`filesDir/attachments/`) + `cacheDir` (камера) + MediaStore (download) | —       |
+| Камера              | `ActivityResultContracts.TakePicture()` + `FileProvider`       | —              |
 | Настройки           | DataStore Preferences (**тема + фильтры тегов + недавние эмодзи**) | 1.2.1      |
 | Язык приложения     | `AppCompatDelegate.setApplicationLocales()`                   | appcompat 1.7  |
 | Асинхронность       | Coroutines & Flow + `Channel` для one-shot событий            | 1.10.2         |
@@ -101,6 +103,8 @@ ru.maxgog.pagebook
     │                             #   EmojiPickerViewModel (недавние эмодзи),
     │                             #   OverflowMenu, AttachmentPreviewList,
     │                             #   AttachmentImageLoader, AttachmentPicker,
+    │                             #   CameraPicker (TakePicture + FileProvider),
+    │                             #   FullScreenAttachmentViewer (pinch/double-tap zoom),
     │                             #   ResizeImageDialog
     ├── notes/                    # NotesScreen, NoteEditScreen + ViewModels + UiStates + NoteItem
     ├── tasks/                    # TaskListScreen, TaskEditScreen, TaskItem,
@@ -355,6 +359,11 @@ AlertDialog
 плодить отдельные таблицы и один и тот же UI-компонент
 (`AttachmentPreviewList`) переиспользовать в обоих редакторах.
 
+Источники вложения:
+- **Photo Picker** (`ActivityResultContracts.PickVisualMedia`) — `rememberPhotoPicker`;
+- **Системная камера** (`ActivityResultContracts.TakePicture()`) — `rememberCameraPicker`;
+- **Документы** (`ActivityResultContracts.OpenDocument`) — `rememberFilePicker`.
+
 ### ⚠️ Ключевая особенность: `localPath` — относительный
 
 `AttachmentFileStore.save()` кладёт файл в `filesDir/attachments/<uuid>.<ext>`
@@ -370,7 +379,79 @@ val file = File(File(context.filesDir, "attachments"), attachment.localPath)
 val file = File(attachment.localPath)
 ```
 
-Это правило касается `AttachmentPreviewList.kt`, `AttachmentImageLoader.kt` и `AttachmentFileStore.open()`.
+Это правило касается `AttachmentPreviewList.kt`, `AttachmentImageLoader.kt`,
+`FullScreenAttachmentViewer.kt` и `AttachmentFileStore.open()`.
+
+### 📷 Камера как источник изображения
+
+**`rememberCameraPicker`** (`ui/components/CameraPicker.kt`) — обёртка над
+`ActivityResultContracts.TakePicture()`:
+
+- Временный снимок пишется в `cacheDir/camera_<timestamp>.jpg`.
+- Отдаётся системной камере через **`FileProvider`**
+  (`authority = "${packageName}.fileprovider"`). Провайдер объявлен
+  в `AndroidManifest.xml`, пути — в `res/xml/file_paths.xml`
+  (`<cache-path name="camera_cache" path="." />`).
+- При `success = true` колбэк получает `content-URI` → прокидывает в
+  `attachUri()` → `SaveAttachmentUseCase` копирует содержимое в
+  `filesDir/attachments/<uuid>.jpg`. Кэш-файл в `cacheDir` остаётся
+  и вычищается системой.
+- При `success = false` пустой кэш-файл удаляется, `pendingFile`
+  сбрасывается.
+- **Разрешение `CAMERA` не требуется:** `ACTION_IMAGE_CAPTURE`
+  выполняет отдельное приложение камеры, которое само управляет
+  своими правами.
+
+> **Почему `FileProvider`, а не `MediaStore.Images.Media.insert`:** на
+> API 29+ вставка в `MediaStore` требует либо `WRITE_EXTERNAL_STORAGE`
+> (deprecated), либо сценарного `MediaStore` API, который тянет за собой
+> лишние разрешения и `ContentValues`. `FileProvider` + `cacheDir`
+> не требует разрешений и работает одинаково на всех API 28+, а файл
+> временно полностью под контролем приложения.
+
+### 🖼 Fullscreen-просмотр вложений
+
+**`FullScreenAttachmentViewer`** (`ui/components/FullScreenAttachmentViewer.kt`) —
+`Dialog(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)`
+на весь экран.
+
+- **Жесты:**
+    - **pinch-to-zoom** через `rememberTransformableState` — масштаб 1×..5×;
+      панорамирование двумя пальцами срабатывает только при `scale > 1`,
+      при возврате к 1× `offset` сбрасывается в `Offset.Zero`;
+    - **double-tap** через `detectTapGestures(onDoubleTap = …)` — переключает
+      1× ↔ 2.5×;
+    - **back / кнопка «Закрыть»** — `onDismiss`.
+- **Верхняя панель** (`Surface` с `Color.Black.copy(alpha = 0.45f)` +
+  `windowInsetsPadding(WindowInsets.statusBars)`): закрыть, имя файла,
+  скачать (тот же `downloadAttachment` из ViewModel).
+- **Bitmap кэшируется** через `remember(attachment.localPath)` — при
+  повторном открытии того же вложения повторного `decodeFile` не происходит.
+- **Вызов:** `AttachmentPreviewList` принимает опциональный
+  `onImageClick: ((Attachment) -> Unit)? = null`; тап по превью
+  изображения открывает viewer. Внутренние `IconButton` (крестик/
+  скачивание) перехватывают свои клики, поэтому тап по иконке
+  удаляет/скачивает, а по самой картинке — открывает fullscreen.
+
+```kotlin
+// В NoteEditScreen / TaskEditScreen
+var viewingAttachment by remember { mutableStateOf<Attachment?>(null) }
+
+AttachmentPreviewList(
+    attachments = currentAttachments,
+    onRemove = viewModel::removeAttachment,
+    onDownload = viewModel::downloadAttachment,
+    onImageClick = { viewingAttachment = it }
+)
+
+viewingAttachment?.let { attachment ->
+    FullScreenAttachmentViewer(
+        attachment = attachment,
+        onDismiss = { viewingAttachment = null },
+        onDownload = { viewModel.downloadAttachment(attachment) }
+    )
+}
+```
 
 ## 🔔 Глобальная система уведомлений (Snackbar)
 
@@ -417,7 +498,7 @@ class NoteEditViewModel @Inject constructor(
 - Превью вложений (`AttachmentPreviewList`) над редактором.
 - `RichTextEditor` на `weight(1f)`.
 - `FormattingToolbar` использует `windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))` — тулбар **всегда над клавиатурой**.
-- Кнопки «Фото» и «Файл» в `TopAppBar` — через `rememberPhotoPicker` / `rememberFilePicker`.
+- Кнопки «Фото», «Камера» и «Файл» в `TopAppBar` — через `rememberPhotoPicker` / `rememberCameraPicker` / `rememberFilePicker`.
 
 ## ⚡ One-Shot Events (Channel)
 
@@ -510,6 +591,50 @@ sequenceDiagram
     Note over DB: UPDATE, а не INSERT (иначе SQLiteConstraintException)
 ```
 
+### Снимок с камеры → вложение
+```mermaid
+sequenceDiagram
+    participant UI as NoteEditScreen
+    participant Cam as rememberCameraPicker
+    participant FP as FileProvider
+    participant Sys as System Camera
+    participant VM as NoteEditViewModel
+    participant UC as SaveAttachmentUseCase
+    participant FS as AttachmentFileStore
+
+    UI->>Cam: pickCamera()
+    Cam->>Cam: File(cacheDir/camera_<ts>.jpg)
+    Cam->>FP: getUriForFile(context, authority, file)
+    FP-->>Cam: content-URI
+    Cam->>Sys: TakePicture.launch(uri)
+    Sys-->>Cam: success = true
+    Cam-->>UI: onPicked(contentUri)
+    UI->>VM: attachUri(contentUri)
+    VM->>UC: invoke(uri, NOTE, ownerId)
+    UC->>FS: save(inputStream, ext) → filesDir/attachments/uuid.jpg
+    FS-->>UC: "uuid.jpg"
+    UC-->>VM: Attachment(id, ...)
+    VM-->>UI: pendingAttachments += Attachment
+```
+
+### Fullscreen-просмотр вложения
+```mermaid
+sequenceDiagram
+    participant UI as NoteEditScreen
+    participant List as AttachmentPreviewList
+    participant Viewer as FullScreenAttachmentViewer
+    participant VM as NoteEditViewModel
+
+    UI->>List: render(attachments)
+    List->>UI: onImageClick(attachment)
+    UI->>Viewer: show(attachment)
+    Viewer->>Viewer: BitmapFactory.decodeFile(filesDir/attachments/localPath)
+    Note over Viewer: pinch / double-tap / панорамирование
+    Viewer->>VM: downloadAttachment(attachment) (по кнопке «Скачать»)
+    VM-->>Viewer: MediaStoreDownloader → Pictures/
+    Viewer->>UI: onDismiss()
+```
+
 ### Фильтрация списка по тегу (persist + OR/AND)
 ```mermaid
 sequenceDiagram
@@ -597,6 +722,11 @@ sequenceDiagram
 | **Полиморфные вложения (`ownerType` + `ownerId`)**                           | Одна таблица и один UI-компонент для Notes и Tasks.                                                           |
 | **`localPath` — относительный путь**                                         | Отвязка от абсолютного `filesDir` (меняется между установками/бэкапами).                                      |
 | **`@Update` для pending-вложений**                                           | Избегаем `SQLiteConstraintException` при повторном `insert` с тем же `id`.                                    |
+| **`FileProvider` + `cacheDir` для камеры**                                   | Снимок не требует `CAMERA`-разрешения; временный файл полностью под контролем приложения; `SaveAttachmentUseCase` сам копирует в `filesDir` |
+| **`TakePicture` + `pendingFile` (File) в state**                             | `TakePicture` не возвращает URI — храним `File`, из него получаем URI в колбэке и умеем `delete()` при отмене. |
+| **`Dialog(usePlatformDefaultWidth = false)` для fullscreen**                 | Не требует отдельного экрана/навигации; переиспользует `downloadAttachment` из ViewModel.                      |
+| **`rememberTransformableState` + `graphicsLayer` для zoom**                  | Один state (scale/offset), без ручного `detectTransformGestures`; double-tap через `detectTapGestures`.        |
+| **`onImageClick` в `AttachmentPreviewList` (опционально)**                   | Внутренние `IconButton` перехватывают свои клики; тап по картинке открывает viewer, тап по иконке — действие.  |
 | **`TagFilterRepository` на DataStore**                                       | Фильтр переживает перезапуск; каждый модуль (`NOTES`/`TASKS`/`CALENDAR`) помнит свой `tagIds + mode`.         |
 | **`TagFilterState(tagIds, mode)` в Domain**                                  | Тип-безопасное представление фильтра; легко расширять (например, `FilterMode.NOT`), не ломая ViewModel.       |
 | **`applyTagFilter` — общая утилита в `domain/util`**                         | Устраняет дублирование OR/AND между тремя ViewModel; тестируется один раз.                                    |
@@ -635,10 +765,11 @@ sequenceDiagram
 - [x] Починить смену языка через **`AppCompatDelegate`**.
 - [x] Добавить **One-Shot Events** через `Channel`.
 - [x] Добавить **подсистему вложений** (изображения + файлы, общая для Notes и Tasks).
+- [x] **Камера как источник изображения** — `rememberCameraPicker` (`TakePicture` + `FileProvider`, `cacheDir`), пункт «Сделать фото» в редакторах заметок/задач.
+- [x] **Просмотр вложений на весь экран** (fullscreen viewer) — `FullScreenAttachmentViewer` (pinch-to-zoom 1×..5×, double-tap 1×↔2.5×, скачивание из fullscreen), `AttachmentPreviewList.onImageClick`.
 - [x] Внедрить **глобальную систему уведомлений** с фурсоной (`AppNotificationManager` + `FursonaSnackbar`).
 - [x] Добавить **пасхалку** и аватар разработчика в настройки.
-- [ ] Просмотр вложений на весь экран (fullscreen viewer).
-- [ ] Камера как источник изображения (сейчас только галерея).
+- [x] Просмотр вложений на весь экран (fullscreen viewer).
 - [ ] **Мультиверсионные заметки для соцсетей** — несколько версий одной
   заметки, адаптированных под разные платформы. Возможная реализация:
   отдельная сущность `NoteVariant` (`noteId`, `platform`, `title`,
@@ -661,8 +792,12 @@ sequenceDiagram
 - [Hilt — `@Binds`](https://developer.android.com/training/dependency-injection/hilt-android#hilt-modules)
 - [MediaStore — Download files](https://developer.android.com/training/data-storage/shared/media)
 - [Photo picker](https://developer.android.com/training/data-storage/shared/photopicker)
+- [TakePicture — Activity Result API](https://developer.android.com/training/basics/intents/result#kotlin)
+- [FileProvider](https://developer.android.com/reference/androidx/core/content/FileProvider)
 - [Compose — FilterChip](https://developer.android.com/develop/ui/compose/components/chip#filter-chip)
 - [Compose — Badge](https://developer.android.com/develop/ui/compose/components/badge)
+- [Compose — Transformable / pinch-to-zoom](https://developer.android.com/develop/ui/compose/touch-input/pointer-input/multi-touch)
+- [Compose — detectTapGestures (double-tap)](https://developer.android.com/develop/ui/compose/touch-input/pointer-input/tap-and-press)
 - [Material 3 — Long press / combined gestures](https://developer.android.com/develop/ui/compose/touch-input/pointer-input/drag-swipe-fling)
 - [Character.getName — Unicode name](https://docs.oracle.com/javase/8/docs/api/java/lang/Character.html#getName-int-)
 - [Unicode emoji list](https://unicode.org/emoji/charts/full-emoji-list.html)

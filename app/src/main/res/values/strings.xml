@@ -163,4 +163,9 @@
     <string name="search_emoji">Search emoji</string>
     <string name="recent_emojis">Recent</string>
     <string name="no_emojis_found">No emojis found</string>
+
+    <string name="take_photo">Take photo</string>
+    <string name="close">Close</string>
+    <string name="download">Download</string>
+    <string name="attachment_load_error">Failed to load image</string>
 </resources>

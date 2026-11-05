@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,12 +27,15 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.maxgog.pagebook.R
+import ru.maxgog.pagebook.domain.model.Attachment
 import ru.maxgog.pagebook.domain.model.Tag
 import ru.maxgog.pagebook.ui.components.AttachmentPreviewList
 import ru.maxgog.pagebook.ui.components.CreateTagDialog
 import ru.maxgog.pagebook.ui.components.DateTimePickerDialog
+import ru.maxgog.pagebook.ui.components.FullScreenAttachmentViewer
 import ru.maxgog.pagebook.ui.components.TagChip
 import ru.maxgog.pagebook.ui.components.TagPickerDialog
+import ru.maxgog.pagebook.ui.components.rememberCameraPicker
 import ru.maxgog.pagebook.ui.components.rememberFilePicker
 import ru.maxgog.pagebook.ui.components.rememberPhotoPicker
 import java.text.SimpleDateFormat
@@ -69,6 +73,10 @@ fun TaskEditScreen(
 
     val pickImage = rememberPhotoPicker { uri -> viewModel.attachUri(uri) }
     val pickFile = rememberFilePicker { uri -> viewModel.attachUri(uri) }
+    val pickCamera = rememberCameraPicker(
+        onPicked = { uri -> viewModel.attachUri(uri) }
+    )
+    var viewingAttachment by remember { mutableStateOf<Attachment?>(null) }
 
     val currentAttachments = when (val s = uiState) {
         is TaskEditUiState.Editing -> s.attachments
@@ -160,6 +168,13 @@ fun TaskEditScreen(
                                     Icon(Icons.Default.AttachFile, contentDescription = null)
                                 }
                             )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.take_photo)) },
+                                onClick = { showMoreMenu = false; pickCamera() },
+                                leadingIcon = {
+                                    Icon(Icons.Default.PhotoCamera, contentDescription = null)
+                                }
+                            )
                             if (currentTask != null) {
                                 HorizontalDivider(
                                     modifier = Modifier.padding(vertical = 4.dp),
@@ -246,7 +261,9 @@ fun TaskEditScreen(
                     AttachmentPreviewList(
                         attachments = currentAttachments,
                         onRemove = viewModel::removeAttachment,
-                        onDownload = viewModel::downloadAttachment
+                        onDownload = viewModel::downloadAttachment,
+                        onImageClick = { viewingAttachment = it },
+                        modifier = Modifier.padding(bottom = 8.dp),
                     )
                 }
 
@@ -412,6 +429,14 @@ fun TaskEditScreen(
                 showCreateTag = false
                 editingTag = null
             }
+        )
+    }
+
+    viewingAttachment?.let { attachment ->
+        FullScreenAttachmentViewer(
+            attachment = attachment,
+            onDismiss = { viewingAttachment = null },
+            onDownload = { viewModel.downloadAttachment(attachment) }
         )
     }
 }

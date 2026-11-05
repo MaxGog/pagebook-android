@@ -3,6 +3,7 @@ package ru.maxgog.pagebook.ui.components
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -32,6 +33,7 @@ fun AttachmentPreviewList(
     attachments: List<Attachment>,
     onRemove: (Attachment) -> Unit,
     onDownload: (Attachment) -> Unit,
+    onImageClick: ((Attachment) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     if (attachments.isEmpty()) return
@@ -46,7 +48,9 @@ fun AttachmentPreviewList(
                 ImageThumb(
                     attachment = a,
                     onRemove = { onRemove(a) },
-                    onDownload = { onDownload(a) }
+                    onDownload = { onDownload(a) },
+                    onClick = onImageClick?.let { { it(a) } }
+
                 )
             } else {
                 FileChip(
@@ -63,7 +67,8 @@ fun AttachmentPreviewList(
 private fun ImageThumb(
     attachment: Attachment,
     onRemove: () -> Unit,
-    onDownload: () -> Unit
+    onDownload: () -> Unit,
+    onClick: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val bitmap = remember(attachment.localPath) {
@@ -75,6 +80,9 @@ private fun ImageThumb(
             .size(96.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .then(
+                if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+            )
     ) {
         if (bitmap != null) {
             Image(

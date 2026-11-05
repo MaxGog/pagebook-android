@@ -245,6 +245,47 @@
   заголовком/тегами; pending-вложения для новых сущностей привязываются
   к `ownerId` после `save*` через **`updateAttachment`**.
 
+**Attachments — камера и fullscreen-просмотр**
+- **`rememberCameraPicker`** (`ui/components/CameraPicker.kt`) — обёртка над
+  `ActivityResultContracts.TakePicture()`.
+  - Временный снимок пишется в `cacheDir/camera_<timestamp>.jpg`.
+  - Отдаётся системной камере через **`FileProvider`**
+    (`authority = "${packageName}.fileprovider"`), объявленный в
+    `AndroidManifest.xml` + `res/xml/file_paths.xml`
+    (`<cache-path name="camera_cache" path="." />`).
+  - При `success = true` → `onPicked(contentUri)` → `attachUri()` →
+    `SaveAttachmentUseCase` копирует содержимое в `filesDir/attachments/`.
+    Кэш-файл вычищается системой.
+  - При `success = false` пустой файл удаляется, `pendingFile` сбрасывается.
+  - **`CAMERA` permission не нужен** — `ACTION_IMAGE_CAPTURE` выполняет
+    отдельное приложение камеры.
+- **`FullScreenAttachmentViewer`** (`ui/components/FullScreenAttachmentViewer.kt`) —
+  полноэкранный просмотр изображения-вложения:
+  - `Dialog(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)`.
+  - **pinch-to-zoom** (1×..5×) через `rememberTransformableState`; панорамирование
+    двумя пальцами только при `scale > 1`, при 1× `offset` сбрасывается в
+    `Offset.Zero`.
+  - **double-tap** через `detectTapGestures(onDoubleTap = …)` — 1× ↔ 2.5×.
+  - Верхняя панель (`Surface` + `windowInsetsPadding(WindowInsets.statusBars)`):
+    закрыть / имя файла / скачать (`downloadAttachment` из ViewModel).
+  - Bitmap кэшируется через `remember(attachment.localPath)`.
+  - Путь разрешается относительно `filesDir/attachments` (см. правило
+    про относительный `localPath`).
+- **`AttachmentPreviewList`** — новый параметр
+  `onImageClick: ((Attachment) -> Unit)? = null`; тап по превью (не по
+  крестику/скачиванию) открывает fullscreen.
+- **`NoteEditScreen` / `TaskEditScreen`** — пункт **«Сделать фото»**
+  (`Icons.Default.PhotoCamera`) в `DropdownMenu` `showMoreMenu`; вызов
+  `pickCamera()`. `var viewingAttachment by remember { mutableStateOf<Attachment?>(null) }`
+  + `FullScreenAttachmentViewer` в конце композиции.
+- **`AndroidManifest.xml`** — `<provider>` для
+  `androidx.core.content.FileProvider`
+  (`authorities = "${applicationId}.fileprovider"`, `exported = false`,
+  `grantUriPermissions = true`).
+- **`res/xml/file_paths.xml`** — новый файл, `<cache-path name="camera_cache" path="." />`.
+- **Строки** (`strings.xml` ru/en): `take_photo`, `close`, `download`,
+  `attachment_load_error`.
+
 **Единая база данных**
 - **`PageBookDatabase`** — единая `@Database` с **8 сущностями**
   (`NoteModel`, `TaskModel`, `EventModel`, `TagModel`, `NoteTagCrossRef`,
@@ -315,20 +356,23 @@
   (TagFilterRow, OR/AND, persist, badge), **«✏️ Редактирование тегов
   и счётчик использования»** (CreateTagDialog в режиме edit, TagEditViewModel,
   TagUsage) и **«🔎 Emoji picker: поиск и недавние»** (4 канала матчинга,
-  `RecentEmojiRepository` на DataStore, UI-поток); новые mermaid-диаграммы
-  «Фильтрация списка по тегу (persist + OR/AND)», «Редактирование тега
-  с usage» и «Выбор эмодзи с поиском и недавними»; обновлены «Ключевые
-  архитектурные решения» (4 новые строки про emoji search/recent) и roadmap.
+  `RecentEmojiRepository` на DataStore, UI-поток); **новые подразделы
+  «📷 Камера как источник изображения»** (TakePicture + FileProvider)
+  **и «🖼 Fullscreen-просмотр вложений»** (pinch-to-zoom, double-tap);
+  новые mermaid-диаграммы «Снимок с камеры → вложение»,
+  «Fullscreen-просмотр вложения», «Фильтрация списка по тегу (persist + OR/AND)»,
+  «Редактирование тега с usage» и «Выбор эмодзи с поиском и недавними»;
+  обновлены «Ключевые архитектурные решения» (новые строки про FileProvider,
+  TakePicture, fullscreen viewer, rememberTransformableState) и roadmap.
 - **`README.md`**: раздел «🏷️ Сквозные теги: полный цикл» (плюс блок
   «Выбор эмодзи» про поиск и недавних), новый раздел «✏️ Редактирование
   тегов и счётчик использования», **новый раздел «🔎 Emoji picker:
-  поиск и недавние»**, обновлённый стек (Tag filtering / Tag usage /
-  Tag editing / Emoji search / Recent emojis), `EmojiPickerViewModel` /
-  `RecentEmojiRepositoryImpl` / `EmojiCatalog.search` в структуре проекта,
-  новые пункты в roadmap.
+  поиск и недавние»**, **раздел «📷 Камера и 🖼 fullscreen-просмотр»**,
+  обновлённый стек (Camera / Fullscreen viewer), `CameraPicker` /
+  `FullScreenAttachmentViewer` в структуре проекта, новые пункты в roadmap.
 - **`CHANGELOG.md`**: добавлены блоки про persist / OR-AND / badge /
-  edit / usage / emoji search / recent emojis, соответствующие пункты
-  перенесены из `Planned` в `Added`.
+  edit / usage / emoji search / recent emojis / **camera / fullscreen viewer**,
+  соответствующие пункты перенесены из `Planned` в `Added`.
 
 ### Changed
 
@@ -379,8 +423,9 @@
 - **`SettingsScreen`**: `SettingsGroup` (Card 28dp) + `ListItem` с прозрачным фоном;
   секции с `SettingsSection`; `AboutSettings` в `Card`.
 - **`AppLanguage`**: `SYSTEM(null)`, `RUSSIAN("ru")`, `ENGLISH("en")`, `@StringRes` названия.
-- **`NoteEditScreen` / `TaskEditScreen`**: добавлены кнопки `AddPhotoAlternate` и
-  `AttachFile` в `TopAppBar`, `AttachmentPreviewList` под заголовком.
+- **`NoteEditScreen` / `TaskEditScreen`**: добавлены кнопки `AddPhotoAlternate`,
+  `AttachFile` и **`PhotoCamera`** в `DropdownMenu`; `AttachmentPreviewList`
+  под заголовком; **`FullScreenAttachmentViewer` при тапе по превью**.
 - **`FormattingToolbar`**: `windowInsetsPadding(navigationBars ∪ ime)` — не уходит под клавиатуру.
 - **`TagChip`**: новые параметры `onEdit` и `onLongClick` (иконка карандаша
   в `trailingIcon`, long-press для переключения OR↔AND).
@@ -410,6 +455,21 @@
   - сигнатура Composable не изменилась (`onDismiss`, `onEmojiSelected`),
     `CreateTagDialog` менять не нужно — `hiltViewModel()` подхватит VM из графа.
 
+**Attachments / Camera / Fullscreen**
+- **`AttachmentPreviewList`**: новый параметр `onImageClick: ((Attachment) -> Unit)? = null`.
+  `ImageThumb` получил `onClick: (() -> Unit)? = null`; тап по картинке
+  открывает fullscreen, внутренние `IconButton` (крестик/скачивание)
+  перехватывают свои клики (не «протекают» в родителя).
+- **`rememberCameraPicker`** — `pendingFile: File?` в state (не `Uri`),
+  потому что `TakePicture` возвращает только `Boolean`; `File` нужен
+  и для повторного `getUriForFile`, и для `delete()` при отмене.
+- **`NoteEditScreen` / `TaskEditScreen`** — `pickCamera` + `viewingAttachment`
+  + финальный `viewingAttachment?.let { FullScreenAttachmentViewer(...) }`.
+- **`AndroidManifest.xml`** — `<provider>` для `FileProvider`.
+- **`res/xml/file_paths.xml`** — новый файл, `<cache-path>` для камеры.
+- **`strings.xml`** (ru/en) — новые строки `take_photo`, `close`, `download`,
+  `attachment_load_error`.
+
 **Notifications**
 - Единая система внутренних уведомлений `AppNotificationManager` (Hilt `@Singleton`)
   на `Channel` + `SharedFlow`-подобный API (`success/error/info/easterEgg`).
@@ -431,20 +491,25 @@
 - **Добавлены для emoji picker**: `search_emoji` («Поиск эмодзи» / «Search emoji»),
   `recent_emojis` («Недавние» / «Recent»), `no_emojis_found`
   («Эмодзи не найдены» / «No emojis found»).
+- **Добавлены для камеры и fullscreen**: `take_photo` («Сделать фото» / «Take photo»),
+  `close` («Закрыть» / «Close»), `download` («Скачать» / «Download»),
+  `attachment_load_error` («Не удалось загрузить изображение» / «Failed to load image»).
 
 **Документация**
 - `ARCHITECTURE.md`: добавлены разделы «Адаптивный UI», «One-Shot Events»,
-  «Настройки (DataStore + AppCompatDelegate)», **«Подсистема вложений (Attachments)»**,
+  «Настройки (DataStore + AppCompatDelegate)», **«Подсистема вложений (Attachments)»**
+  (включая **«📷 Камера как источник изображения»** и **«🖼 Fullscreen-просмотр вложений»**),
   **«Фильтрация списков по тегам»** (persist, OR/AND, badge),
   **«Редактирование тегов и счётчик использования»**,
   **«🔎 Emoji picker: поиск и недавние»**; обновлены диаграммы (sequence для
-  attach, фильтрации, редактирования тега, **выбора эмодзи**), БД
-  (`version = 4`, 8 сущностей), roadmap.
+  attach, camera, fullscreen viewer, фильтрации, редактирования тега,
+  **выбора эмодзи**), БД (`version = 4`, 8 сущностей), roadmap.
 - `README.md`: обновлены стек (Adaptive, M3 Expressive, Attachments,
-  Tag filtering / Tag usage / Tag editing, **Emoji search / Recent emojis**),
-  новые разделы «🏷️ Фильтрация по тегам», «✏️ Редактирование тегов
-  и счётчик использования» и **«🔎 Emoji picker: поиск и недавние»**, roadmap.
-- `CHANGELOG.md`: актуализирован.
+  Tag filtering / Tag usage / Tag editing, **Emoji search / Recent emojis**,
+  **Camera / Fullscreen viewer**), новые разделы «🏷️ Фильтрация по тегам»,
+  «✏️ Редактирование тегов и счётчик использования», **«🔎 Emoji picker:
+  поиск и недавние»**, **«📷 Камера и 🖼 fullscreen-просмотр»**, roadmap.
+- `CHANGELOG.md`: актуализирован, добавлены блоки про камеру и fullscreen viewer.
 - `CONTRIBUTING.md`: добавлен подраздел про «ловушку» с `localPath`.
 
 ### Removed
@@ -557,13 +622,28 @@
   гарантированно не содержат `|`. Это исключает «разваливание» списка
   на неверные токены и появление «фантомных» эмодзи в секции «Недавние».
 
+**Camera / Fullscreen**
+- **`FileProvider` «не видит» файл** — файл в `cacheDir` должен быть создан
+  **до** `getUriForFile`, иначе `FileProvider` кинет `IllegalArgumentException`.
+  В `rememberCameraPicker` файл создаётся через `createNewFile()` перед
+  вызовом `FileProvider`.
+- **`TakePicture` не возвращает URI** — храним `pendingFile: File?` в state,
+  а не `Uri`; на успехе достаём URI повторно из `File`, на отмене —
+  `file.delete()`.
+- **Ошибка «Cannot resolve authority»** — `android:authorities` в манифесте
+  должен точно совпадать с `"${context.packageName}.fileprovider"`,
+  иначе `FileProvider.getUriForFile` кинет `IllegalArgumentException`.
+  `authority` лучше писать через `${applicationId}` — совпадёт автоматически.
+- **Fullscreen viewer не открывается по тапу** — `Modifier.clickable`
+  навешан на сам `Box` превью, а не на `Image`; иначе `Image` без
+  `clickable` не получает события. Также `IconButton` крестика/скачивания
+  перехватывают свои клики — это желаемое поведение.
+
 ### Planned
 - **Удаление из недавних эмодзи** — long-press на эмодзи в секции «Недавние»
   (`removeRecentEmoji(emoji)` в репозитории).
 - **Кнопка «Очистить недавние»** рядом с секцией (аналог `clear_filters`).
 - **`ListDetailPaneScaffold` для Notes и Calendar** (аналогично Tasks).
-- **Fullscreen-просмотр вложений** по тапу на превью.
-- **Камера как источник изображения** (сейчас только галерея + документы).
 - **Мультиверсионные заметки для соцсетей** — несколько версий одной заметки
   под разные платформы (`NoteVariant`).
 - **`MIGRATION_3_4`** для `attachments` (сейчас `fallbackToDestructiveMigration`).

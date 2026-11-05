@@ -27,12 +27,15 @@ import com.mohamedrejeb.richeditor.model.RichTextState
 import com.mohamedrejeb.richeditor.model.rememberRichTextState
 import com.mohamedrejeb.richeditor.ui.material3.RichTextEditor
 import ru.maxgog.pagebook.R
+import ru.maxgog.pagebook.domain.model.Attachment
 import ru.maxgog.pagebook.domain.model.Tag
 import ru.maxgog.pagebook.ui.components.AttachmentImageLoader
 import ru.maxgog.pagebook.ui.components.AttachmentPreviewList
 import ru.maxgog.pagebook.ui.components.CreateTagDialog
+import ru.maxgog.pagebook.ui.components.FullScreenAttachmentViewer
 import ru.maxgog.pagebook.ui.components.TagChip
 import ru.maxgog.pagebook.ui.components.TagPickerDialog
+import ru.maxgog.pagebook.ui.components.rememberCameraPicker
 import ru.maxgog.pagebook.ui.components.rememberFilePicker
 import ru.maxgog.pagebook.ui.components.rememberPhotoPicker
 
@@ -49,11 +52,15 @@ fun NoteEditScreen(
 
     val pickImage = rememberPhotoPicker { uri -> viewModel.attachUri(uri) }
     val pickFile = rememberFilePicker { uri -> viewModel.attachUri(uri) }
+    val pickCamera = rememberCameraPicker(
+        onPicked = { uri -> viewModel.attachUri(uri) }
+    )
 
     var showTagPicker by remember { mutableStateOf(false) }
     var showCreateTag by remember { mutableStateOf(false) }
     var editingTag by remember { mutableStateOf<Tag?>(null) }
     var showMoreMenu by remember { mutableStateOf(false) }
+    var viewingAttachment by remember { mutableStateOf<Attachment?>(null) }
 
     val currentNote = (uiState as? NoteEditUiState.Editing)?.note
     val currentTags = when (val s = uiState) {
@@ -159,6 +166,13 @@ fun NoteEditScreen(
                                     onClick = { showMoreMenu = false; pickFile() },
                                     leadingIcon = {
                                         Icon(Icons.Default.AttachFile, contentDescription = null)
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.take_photo)) },
+                                    onClick = { showMoreMenu = false; pickCamera() },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.PhotoCamera, contentDescription = null)
                                     }
                                 )
                                 if (currentNote != null) {
@@ -296,7 +310,8 @@ fun NoteEditScreen(
                             attachments = currentAttachments,
                             onRemove = viewModel::removeAttachment,
                             onDownload = viewModel::downloadAttachment,
-                            modifier = Modifier.padding(bottom = 8.dp)
+                            modifier = Modifier.padding(bottom = 8.dp),
+                            onImageClick = { viewingAttachment = it }
                         )
                     }
 
@@ -328,13 +343,11 @@ fun NoteEditScreen(
                 showCreateTag = true
             },
             onEditTag = { tag ->
-                // Закрываем пикер, иначе два AlertDialog разом —
-                // на части устройств второй не покажется.
                 showTagPicker = false
                 editingTag = tag
                 showCreateTag = true
             },
-            onDismiss = { showTagPicker = false }
+            onDismiss = { showTagPicker = false },
         )
     }
 
@@ -361,6 +374,14 @@ fun NoteEditScreen(
                 showCreateTag = false
                 editingTag = null
             }
+        )
+    }
+
+    viewingAttachment?.let { attachment ->
+        FullScreenAttachmentViewer(
+            attachment = attachment,
+            onDismiss = { viewingAttachment = null },
+            onDownload = { viewModel.downloadAttachment(attachment) }
         )
     }
 }

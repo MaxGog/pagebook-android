@@ -25,8 +25,8 @@ PageBook — это нативное Android-приложение для раб�
 ### 📝 Умные заметки
 - Создание и редактирование заметок с rich-text форматированием
 - Адаптивная сетка заметок (StaggeredGrid)
-- **Вложения**: фото из галереи и файлы через Photo Picker / `OpenDocument`
-- Превью вложений прямо в редакторе, скачивание в `Pictures`/`Downloads`
+- **Вложения**: фото из галереи, **снимок с камеры** и файлы через Photo Picker / **`TakePicture`** / `OpenDocument`
+- Превью вложений прямо в редакторе, **fullscreen-просмотр с pinch-to-zoom**, скачивание в `Pictures`/`Downloads`
 - Создание задач прямо из заметок с автоматическим извлечением дат
 - **Цветные теги с эмодзи** — палитра из 7 цветов + каталог из 200+ эмодзи
 - **Поиск и недавние эмодзи** в пикере — по символу, ключевым словам (ru/en), Unicode-имени и категории; последние 20 сохраняются в `DataStore`
@@ -36,7 +36,7 @@ PageBook — это нативное Android-приложение для раб�
 - Задачи с напоминаниями и связью с заметками
 - Сортировка: незавершённые сверху, новые первыми
 - Автоматическое определение даты из текста заметки (ML Kit)
-- **Вложения**: те же компоненты, что и в заметках (общая подсистема)
+- **Вложения**: те же компоненты, что и в заметках (общая подсистема), включая **камеру** и **fullscreen-viewer**
 - **Цветные теги с эмодзи** — общие с заметками и календарём
 - **Фильтрация по тегам** — общий компонент `TagFilterRow`
 
@@ -89,7 +89,8 @@ PageBook — это нативное Android-приложение для раб�
 ### 📎 Вложения (Attachments)
 Изображения и файлы, прикреплённые к заметкам или задачам. Общая подсистема:
 - Файлы хранятся в **app-private storage** (`filesDir/attachments/`).
-- Photo Picker (`PickVisualMedia`) и `OpenDocument` для выбора.
+- **Photo Picker** (`PickVisualMedia`), **системная камера** (`TakePicture` через `FileProvider`, файл в `cacheDir`) и **`OpenDocument`** для выбора.
+- **Fullscreen-просмотр** изображений с **pinch-to-zoom** (1×..5×) и **double-tap** (1× ↔ 2.5×), скачиванием из просмотра.
 - Превью, удаление и экспорт в `Pictures`/`Downloads` через **MediaStore**.
 - Pending-вложения для новых сущностей: файл сохраняется сразу, а `ownerId`
   проставляется после сохранения заметки/задачи.
@@ -106,7 +107,9 @@ PageBook — это нативное Android-приложение для раб�
 - **💚 100% Kotlin** — Kotlin 2.2.20
 - **🎨 Jetpack Compose** — BOM 2026.09.00, Material 3 Expressive
 - **💾 Room Database** — единая `PageBookDatabase` (8 entities, version 4)
-- **📎 Attachments** — app-private storage + MediaStore, Photo Picker
+- **📎 Attachments** — app-private storage + MediaStore, Photo Picker, **камера (FileProvider)**
+- **📷 Camera** — системная камера через `ActivityResultContracts.TakePicture()` + `FileProvider` (`cacheDir`)
+- **🖼 Fullscreen viewer** — `Dialog` fullscreen + `rememberTransformableState` (pinch/pan/double-tap)
 - **🔔 Notifications** — глобальный `SnackbarHost` + `Channel` + Hilt Singleton
 - **🏷️ Tag filtering** — `TagFilterRow` (`FilterChip` + `FilterMode.OR/AND`) + `TagFilterRepository` (DataStore) + `applyTagFilter` (domain util)
 - **🔢 Tag usage** — `TagDao.getTagUsage(tagId)` (3 `COUNT(*)` по junction-таблицам)
@@ -132,16 +135,18 @@ graph TD
    C --> D[(PageBookDatabase - Room<br/>notes, tasks, events, tags, cross-refs, attachments)]
    C --> F[(DataStore<br/>theme + tag filters + recent emojis)]
    C --> G[(filesDir/attachments<br/>app-private)]
+   C --> G2[(cacheDir<br/>camera temp)]
    
    A -.->|AppNotificationManager| H[Global Snackbar<br/>FursonaSnackbar]
    A -.->|TagFilterState| I[TagFilterRow<br/>FilterChip + OR/AND]
    A -.->|FilterBadgeIcon| J[Badge count<br/>in TopAppBar]
    A -.->|EmojiPickerViewModel| K[EmojiPickerDialog<br/>search + recent]
+   A -.->|FullScreenAttachmentViewer| L[Pinch/Double-tap zoom]
    C -.-> E[(Remote - Future)]
 ```
 
 ### Clean Architecture
-- **UI Layer**: Jetpack Compose + ViewModel + UiState (sealed interface / data class). Глобальный `Snackbar` управляется из `MainActivity` через `AppNotificationHost`. Состояние фильтра (`TagFilterState`) — часть UiState ViewModel. `EmojiPickerViewModel` изолирует логику недавних эмодзи от `CreateTagDialog`.
+- **UI Layer**: Jetpack Compose + ViewModel + UiState (sealed interface / data class). Глобальный `Snackbar` управляется из `MainActivity` через `AppNotificationHost`. Состояние фильтра (`TagFilterState`) — часть UiState ViewModel. `EmojiPickerViewModel` изолирует логику недавних эмодзи от `CreateTagDialog`. `FullScreenAttachmentViewer` — переиспользуемый компонент, не требует отдельного экрана.
 - **Domain Layer**: Use Cases, доменные модели (Note, Task, Event, Tag, TagColor, Attachment, TagFilterState, FilterMode, TagUsage), интерфейсы репозиториев (`TagFilterRepository`, `RecentEmojiRepository`), `applyTagFilter` (общая утилита).
 - **Data Layer**: Room, DAO, мапперы, реализации репозиториев, DataStore (`SettingsRepository`, `TagFilterRepositoryImpl`, `RecentEmojiRepositoryImpl`), файловое хранилище (`AttachmentFileStore`, `MediaStoreDownloader`), Hilt-модули.
 - **Core Layer**: `AppNotificationManager` (синглтон для событий UI).
@@ -149,7 +154,8 @@ graph TD
 Все три модуля — **Notes**, **Tasks**, **Calendar** — полностью на Clean Architecture.
 Теги работают сквозь все три модуля через единую `PageBookDatabase`,
 включая **фильтрацию** (OR/AND, persist, badge), **редактирование** и **счётчик использования**.
-Вложения — полиморфная связь (`ownerType` + `ownerId`) через общую таблицу.
+Вложения — полиморфная связь (`ownerType` + `ownerId`) через общую таблицу,
+плюс **камера как источник** и **fullscreen-viewer** с зумом.
 Эмодзи-пикер — отдельный переиспользуемый компонент с **поиском** (4 канала) и **недавними** (DataStore).
 
 Подробнее см. в [ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -230,6 +236,8 @@ app/src/main/java/ru/maxgog/pagebook/
 │   │                   #   EmojiPickerViewModel (recent emojis),
 │   │                   #   OverflowMenu, AttachmentPreviewList,
 │   │                   #   AttachmentImageLoader, AttachmentPicker,
+│   │                   #   CameraPicker (TakePicture + FileProvider),
+│   │                   #   FullScreenAttachmentViewer (pinch/double-tap zoom),
 │   │                   #   ResizeImageDialog
 │   ├── notes/          # NotesScreen, NoteEditScreen + ViewModels + UiStates + NoteItem
 │   ├── tasks/          # TaskListScreen, TaskEditScreen, TaskItem,
@@ -243,20 +251,24 @@ app/src/main/java/ru/maxgog/pagebook/
 ├── Converters.kt       # LocalDate ↔ String + toKotlinxLocalDate()
 ├── PageBookApplication.kt
 └── MainActivity.kt
+
+app/src/main/res/xml/
+└── file_paths.xml      # FileProvider paths (cache-path для камеры)
 ```
 
 ## 🧩 Функциональные возможности
 
 | Модуль               | Возможности                                                                                                                                       | Технологии                                     |
 |----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------|
-| **Notes** 📝         | Rich-text заметки, адаптивная сетка, ML Kit для извлечения дат, **теги с эмодзи**, **фильтрация по тегам (OR/AND, persist, badge)**, **вложения** | Compose, Room, RichEditor, ML Kit, PhotoPicker |
-| **Tasks** ✅         | Задачи с напоминаниями, связь с заметками (`noteId`), сортировка, **теги с эмодзи**, **фильтрация по тегам**, **вложения**                        | Compose, StateFlow, Room                       |
+| **Notes** 📝         | Rich-text заметки, адаптивная сетка, ML Kit для извлечения дат, **теги с эмодзи**, **фильтрация по тегам (OR/AND, persist, badge)**, **вложения (галерея + камера + файлы)**, **fullscreen-viewer** | Compose, Room, RichEditor, ML Kit, PhotoPicker, TakePicture |
+| **Tasks** ✅         | Задачи с напоминаниями, связь с заметками (`noteId`), сортировка, **теги с эмодзи**, **фильтрация по тегам**, **вложения (галерея + камера + файлы)**, **fullscreen-viewer** | Compose, StateFlow, Room                       |
 | **Calendar** 🗓️      | События по датам, реактивное обновление, автоскролл, **теги с эмодзи**, **фильтрация (список + точки на днях)**                                   | Compose, kizitonwose Calendar, Room            |
 | **Settings** ⚙️      | Тема (System/Light/Dark), язык (ru/en), **пасхалка с фурсоной**, **аватар разработчика**                                                          | Compose, DataStore, AppCompat                  |
 | **Notifications** 🔔 | Глобальные уведомления (SUCCESS/ERROR/INFO/EASTER_EGG) с аватаром-фурсоной, выходящим за края `Snackbar`                                          | Compose, Channel, Hilt                         |
 | **Tags** 🏷️          | Сквозные теги: 7 цветов macOS + **200+ эмодзи**, **фильтр OR/AND + persist + badge**, **редактирование**, **счётчик использования**               | Room (@Relation + @Junction), Hilt, FilterChip |
 | **Emoji picker** 🔎  | Каталог 200+ эмодзи в 10 категориях, **поиск** (символ / keywords ru+en / Unicode-имя / категория), **недавние** (20, DataStore)                   | Compose, DataStore, Hilt, `Character.getName`  |
-| **Attachments** 📎   | App-private storage + MediaStore, Photo Picker, `@Update` для pending, `<img>` в rich-text                                                        | Room, ContentResolver, LocalImageLoader        |
+| **Attachments** 📎   | App-private storage + MediaStore, Photo Picker + **TakePicture (FileProvider)**, **fullscreen-viewer с pinch/double-tap**, `@Update` для pending, `<img>` в rich-text | Room, ContentResolver, FileProvider, LocalImageLoader |
+| **Camera** 📷        | Системная камера через `TakePicture` + `FileProvider` (cacheDir), без `CAMERA`-permission                                                          | ActivityResultContracts, FileProvider          |
 
 ## 🏷️ Фильтрация по тегам
 
@@ -306,6 +318,22 @@ app/src/main/java/ru/maxgog/pagebook/
 - **`EmojiPickerViewModel`** (`@HiltViewModel`) — `recentEmojis: StateFlow<List<String>>` (WhileSubscribed(5_000)).
 - При выборе любого эмодзи (из «Недавних», категории или поиска) — `viewModel.onEmojiSelected(emoji)` **перед** `onEmojiSelected(...)`, поэтому список обновится к следующему открытию.
 - Секция «Недавние» рендерится **только когда список не пуст** — не засоряет UI у нового пользователя.
+
+## 📷 Камера и 🖼 fullscreen-просмотр
+
+### Камера
+- **Пункт «Сделать фото»** в `DropdownMenu` `showMoreMenu` у `NoteEditScreen` и `TaskEditScreen`.
+- **`rememberCameraPicker`** (`ui/components/CameraPicker.kt`) — обёртка над `ActivityResultContracts.TakePicture()`.
+- Снимок пишется в **`cacheDir/camera_<timestamp>.jpg`**, отдаётся системной камере через **`FileProvider`** (`authority = "${packageName}.fileprovider"`).
+- После успеха `onPicked(contentUri)` → `viewModel.attachUri(uri)` → `SaveAttachmentUseCase` копирует в `filesDir/attachments/`. Кэш-файл вычищается системой.
+- **Разрешение `CAMERA` не требуется** — `ACTION_IMAGE_CAPTURE` выполняет отдельное приложение камеры.
+
+### Fullscreen-viewer
+- **`FullScreenAttachmentViewer`** (`ui/components/FullScreenAttachmentViewer.kt`) — `Dialog(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)` на весь экран.
+- **pinch-to-zoom** (1×..5×) и панорамирование двумя пальцами через `rememberTransformableState`; при `scale == 1×` offset сбрасывается в `Offset.Zero`.
+- **double-tap** — 1× ↔ 2.5× через `detectTapGestures(onDoubleTap = …)`.
+- **Верхняя панель** (`Surface` + `windowInsetsPadding(WindowInsets.statusBars)`): закрыть, имя файла, скачать (тот же `downloadAttachment` из ViewModel).
+- **Вызов:** `AttachmentPreviewList` принимает `onImageClick: ((Attachment) -> Unit)? = null` — тап по картинке открывает viewer, тап по крестику/скачиванию выполняет соответствующее действие.
 
 ## 🔔 Система уведомлений
 
@@ -366,16 +394,16 @@ app/src/main/java/ru/maxgog/pagebook/
 - [x] **Смена языка** через `AppCompatDelegate` (единый источник правды)
 - [x] **One-Shot Events** через `Channel` для навигации
 - [x] **Вложения** для Notes и Tasks (фото + файлы, MediaStore-экспорт, pending)
+- [x] **Камера как источник изображения** — `rememberCameraPicker` (`TakePicture` + `FileProvider`), пункт «Сделать фото» в редакторах
+- [x] **Fullscreen-просмотр вложений** — `FullScreenAttachmentViewer` (pinch-to-zoom, double-tap, скачивание), `AttachmentPreviewList.onImageClick`
 - [x] **Глобальная система уведомлений** (кастомный `Snackbar` с фурсоной)
 - [x] **Пасхалка** (7 тапов по версии) и аватар разработчика в настройках
 - [x] **Смена языка на Android < 13** (требуется `AppCompatActivity`)
-- [ ] **Fullscreen-просмотр вложений** по тапу на превью
-- [ ] **Камера как источник изображения** (сейчас только галерея + документы)
-- [ ] **`ListDetailPaneScaffold` для Notes и Calendar** (аналогично Tasks)
 - [ ] **Мультиверсионные заметки для соцсетей** — одна заметка с несколькими
   «адаптациями» под разные платформы. Сценарий для художника: написал
   пост в заметке → переключился на версию для другой соцсети и слегка
   подправил текст/форматирование/вложения под её формат.
+- [ ] **`ListDetailPaneScaffold` для Notes и Calendar** (аналогично Tasks)
 - [ ] **`MIGRATION_3_4`** для `attachments` (сейчас `fallbackToDestructiveMigration`)
 - [ ] **Синхронизация с облаком** ☁️
 - [ ] **Виджеты для главного экрана** 🏠
