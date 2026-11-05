@@ -159,4 +159,8 @@
     <string name="delete_event_confirm">Удалить событие «%1$s»? Это действие нельзя отменить.</string>
     <string name="title_required">Введите название</string>
     <string name="invalid_time">Неверный формат времени</string>
+
+    <string name="search_emoji">Поиск эмодзи</string>
+    <string name="recent_emojis">Недавние</string>
+    <string name="no_emojis_found">Эмодзи не найдены</string>
 </resources>

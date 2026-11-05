@@ -159,4 +159,8 @@
     <string name="delete_event_confirm">Delete event "%1$s"? This action cannot be undone.</string>
     <string name="title_required">Title is required</string>
     <string name="invalid_time">Invalid time format</string>
+
+    <string name="search_emoji">Search emoji</string>
+    <string name="recent_emojis">Recent</string>
+    <string name="no_emojis_found">No emojis found</string>
 </resources>

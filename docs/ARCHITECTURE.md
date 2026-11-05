@@ -22,11 +22,13 @@ PageBook Android следует официальным рекомендация�
 > в одну `PageBookDatabase` (version 4). Сквозная система **тегов с кастомизацией
 > цвета и эмодзи** доведена до полноценного UX: **фильтрация списков** (OR/AND,
 > persist через DataStore, badge с count), **редактирование тегов** и **счётчик
-> использования**. Добавлена **подсистема вложений** (изображения + файлы,
-> app-private storage, MediaStore), **глобальная система уведомлений**
-> (кастомный `Snackbar` с аватаром-фурсоной) и **пасхалка** в настройках.
-> UI переведён на Material 3 Expressive, локализован на `ru`/`en`,
-> добавлена адаптивность под планшеты.
+> использования**. Эмодзи-пикер получил **поиск** (по ключевым словам,
+> Unicode-имени и категории) и **секцию недавних** (последние 20 в `DataStore`).
+> Добавлена **подсистема вложений** (изображения + файлы, app-private storage,
+> MediaStore), **глобальная система уведомлений** (кастомный `Snackbar`
+> с аватаром-фурсоной) и **пасхалка** в настройках. UI переведён на
+> Material 3 Expressive, локализован на `ru`/`en`, добавлена адаптивность
+> под планшеты.
 
 ## 🛠 Технологический стек
 
@@ -38,7 +40,7 @@ PageBook Android следует официальным рекомендация�
 | Локальное хранилище | Room (одна БД `pagebook.db`)                                  | 2.7.2          |
 | Rich text           | RichEditor (Compose Multiplatform)                            | —              |
 | Файловое хранилище  | App-private (`filesDir/attachments/`) + MediaStore (download) | —              |
-| Настройки           | DataStore Preferences (**тема + фильтры тегов**)              | 1.2.1          |
+| Настройки           | DataStore Preferences (**тема + фильтры тегов + недавние эмодзи**) | 1.2.1      |
 | Язык приложения     | `AppCompatDelegate.setApplicationLocales()`                   | appcompat 1.7  |
 | Асинхронность       | Coroutines & Flow + `Channel` для one-shot событий            | 1.10.2         |
 | DI                  | **Hilt** (`@Binds` + `@Provides`)                             | 2.56.2         |
@@ -69,7 +71,8 @@ ru.maxgog.pagebook
 │   ├── mapper/                   # NoteMapper, TaskMapper, EventMapper, TagMapper,
 │   │                             #   AttachmentMapper
 │   ├── repository/               # *RepositoryImpl, SettingsRepository,
-│   │                             #   TagFilterRepositoryImpl (DataStore)
+│   │                             #   TagFilterRepositoryImpl (DataStore),
+│   │                             #   RecentEmojiRepositoryImpl (DataStore)
 │   └── di/                       # DatabaseModule, RepositoryModule,
 │                                 #   DataStoreModule, AttachmentsModule
 │
@@ -78,7 +81,9 @@ ru.maxgog.pagebook
 │   │                             #   Attachment, AttachmentType, OwnerType,
 │   │                             #   TagFilterState, FilterMode, TagFilterModule,
 │   │                             #   TagUsage
-│   ├── repository/               # Интерфейсы репозиториев
+│   ├── repository/               # NoteRepository, TaskRepository, EventRepository,
+│   │                             #   TagRepository, TagFilterRepository,
+│   │                             #   RecentEmojiRepository, AttachmentRepository
 │   ├── usecase/                  # note/, task/, event/, tag/, attachment/
 │   └── util/                     # TagFilterExt.kt (applyTagFilter)
 │
@@ -92,9 +97,11 @@ ru.maxgog.pagebook
     │                             #   CreateTagDialog (create/edit), TagPickerDialog
     │                             #   (+onEditTag), TagFilterRow (+mode toggle),
     │                             #   FilterBadgeIcon, TagEditViewModel,
-    │                             #   EmojiCatalog, EmojiPickerDialog, OverflowMenu,
-    │                             #   AttachmentPreviewList, AttachmentImageLoader,
-    │                             #   AttachmentPicker, ResizeImageDialog
+    │                             #   EmojiCatalog (+keywords + search()), EmojiPickerDialog,
+    │                             #   EmojiPickerViewModel (недавние эмодзи),
+    │                             #   OverflowMenu, AttachmentPreviewList,
+    │                             #   AttachmentImageLoader, AttachmentPicker,
+    │                             #   ResizeImageDialog
     ├── notes/                    # NotesScreen, NoteEditScreen + ViewModels + UiStates + NoteItem
     ├── tasks/                    # TaskListScreen, TaskEditScreen, TaskItem,
     │                             #   TaskListDetailPane + ViewModels + UiStates
@@ -150,7 +157,7 @@ abstract class PageBookDatabase : RoomDatabase() {
 ### Особенности
 - **`emoji: String?`** — опционально. Без эмодзи рисуется цветная точка, с эмодзи — символ в `leadingIcon`.
 - **`_pendingTags` / `selectedTags`** — ViewModel накапливает выбранные теги для новых (ещё не сохранённых) сущностей, привязка происходит после `save*`.
-- **`EmojiCatalog`** — статический объект (`@StringRes` для категорий), не требует сети.
+- **`EmojiCatalog`** — статический объект (`@StringRes` для категорий), не требует сети. Хранит **словарь ключевых слов** (`ru` + `en`) и умеет искать эмодзи через `search(query, categoryNames)`.
 - **`TagUsage`** — счётчик использования тега (`notes` / `tasks` / `events`), вычисляется через 3 `SELECT COUNT(*)` по junction-таблицам в `TagDao.getTagUsage(tagId)`.
 
 ### 🔍 Фильтрация списков по тегам
@@ -158,11 +165,11 @@ abstract class PageBookDatabase : RoomDatabase() {
 Единый паттерн во всех трёх модулях (**Notes**, **Tasks**, **Calendar**):
 
 1. **`TagFilterRow`** (`ui/components/`) — горизонтальный `LazyRow`:
-   - слева — `AssistChip` режима **`OR`/`AND`** (переключается тапом);
-   - далее — `FilterChip` по каждому тегу (`TagChip` с `selected` для выбранных);
-   - **long-press на любом теге** тоже переключает режим (`onLongClick` в `TagChip`);
-   - в конце — `AssistChip` «Сбросить», если есть выбранные теги.
-   - Компонент не рендерится, если `allTags` пуст.
+    - слева — `AssistChip` режима **`OR`/`AND`** (переключается тапом);
+    - далее — `FilterChip` по каждому тегу (`TagChip` с `selected` для выбранных);
+    - **long-press на любом теге** тоже переключает режим (`onLongClick` в `TagChip`);
+    - в конце — `AssistChip` «Сбросить», если есть выбранные теги.
+    - Компонент не рендерится, если `allTags` пуст.
 2. **`FilterBadgeIcon`** (`ui/components/`) — `IconButton` с `BadgedBox` в
    `TopAppBar`: показывает `filterState.count` (количество выбранных тегов)
    и по тапу скрывает/показывает `TagFilterRow`. Это избавляет от лишнего
@@ -175,11 +182,11 @@ abstract class PageBookDatabase : RoomDatabase() {
    )
    ```
 4. **`TagFilterRepository`** (DataStore) — persist-фильтра по модулю:
-   - `getFilter(module): Flow<TagFilterState>`;
-   - `setFilter(module, state)` — пишет `tag_filter_<module>_ids` и `tag_filter_<module>_mode`;
-   - `clearFilter(module)` — сбрасывает оба ключа.
-   - `module: TagFilterModule` (`NOTES` / `TASKS` / `CALENDAR`) — каждый экран
-     помнит свой фильтр независимо.
+    - `getFilter(module): Flow<TagFilterState>`;
+    - `setFilter(module, state)` — пишет `tag_filter_<module>_ids` и `tag_filter_<module>_mode`;
+    - `clearFilter(module)` — сбрасывает оба ключа.
+    - `module: TagFilterModule` (`NOTES` / `TASKS` / `CALENDAR`) — каждый экран
+      помнит свой фильтр независимо.
 5. **`applyTagFilter`** (`domain/util/TagFilterExt.kt`) — общая утилита,
    устраняющая дублирование OR/AND между тремя ViewModel:
    ```kotlin
@@ -259,6 +266,87 @@ fun clearTagFilter() = viewModelScope.launch {
   По умолчанию `null` (в `AddEventDialog` сейчас не передаётся).
 - **`UpdateTagUseCase`** — валидирует имя (`require(trimmed.isNotEmpty())`),
   копирует `Tag` с новыми `name`/`colorHex`/`emoji`.
+
+### 🔎 Emoji picker: поиск и недавние
+
+`EmojiPickerDialog` (`ui/components/`) — общий компонент выбора эмодзи,
+используется в `CreateTagDialog` и доступен для любого другого сценария.
+Помимо сетки по категориям, поддерживает **поиск** и **секцию недавних**.
+
+#### Поиск: 4 канала матчинга
+
+`EmojiCatalog.search(query, categoryNames)` — чистая функция без Compose,
+поэтому легко тестируется юнит-тестами. Совпадения ищутся одновременно по:
+
+1. **Самому символу** — пользователь может вставить `🎯` из буфера.
+2. **Ключевым словам** `ru/en` из `Map<String, List<String>> keywords` —
+   `"серд"` → все сердца, `"работа"` → 💼, `"cat"` → 🐱 (если появится в каталоге).
+3. **Unicode-имени** через `Character.getName(codePoint)` — fallback,
+   покрывает даже эмодзи без явных ключевых слов (`"grinning"`, `"face"`).
+4. **Названию категории** — `categoryNames` передаются с UI через
+   `stringResource(cat.nameRes)` (уже локализованы), поэтому запрос
+   `"работа"` тянет всю категорию Work.
+
+```kotlin
+fun search(query: String, categoryNames: List<String>): List<String> {
+    val q = query.trim().lowercase()
+    if (q.isEmpty()) return emptyList()
+    val raw = query.trim()
+
+    return categories.flatMapIndexed { idx, cat ->
+        val catName = categoryNames.getOrNull(idx)?.lowercase().orEmpty()
+        val byCategory = catName.isNotEmpty() && catName.contains(q)
+        cat.emojis.filter { emoji ->
+            byCategory ||
+                emoji == raw ||
+                keywords[emoji]?.any { it.lowercase().contains(q) } == true ||
+                unicodeName(emoji)?.lowercase()?.contains(q) == true
+        }
+    }.distinct()
+}
+```
+
+> **Почему категория-имена передаются с UI, а не берутся из ресурсов
+> внутри `object`:** `EmojiCatalog` — обычный Kotlin-объект, у него нет
+> `Context`, а `stringResource` — `@Composable`. Передача готового списка
+> из UI сохраняет `object` чистым и тестируемым, а локализация остаётся
+> в UI-слое.
+
+#### Недавние: `RecentEmojiRepository` (DataStore)
+
+- **`RecentEmojiRepository`** (Domain, interface) — `getRecentEmojis(): Flow<List<String>>` + `addRecentEmoji(emoji)`.
+- **`RecentEmojiRepositoryImpl`** (Data, `@Singleton`) — DataStore Preferences, ключ `recent_emojis`.
+    - Хранит **до 20** эмодзи.
+    - **Дедуплицирует**: выбранный эмодзи перемещается в начало.
+    - Сериализация — `joinToString("|")`. `|` безопасен: эмодзи никогда не содержат его.
+- **`EmojiPickerViewModel`** (`ui/components/`, `@HiltViewModel`):
+  ```kotlin
+  val recentEmojis: StateFlow<List<String>> = recentEmojiRepository
+      .getRecentEmojis()
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+  ```
+- При выборе эмодзи в диалоге (`select(emoji)`): сначала
+  `viewModel.onEmojiSelected(emoji)` → запись в DataStore, затем
+  `onEmojiSelected(emoji)` → возврат в `CreateTagDialog`. К моменту
+  следующего открытия пикера недавние уже обновлены (DataStore → Flow → `StateFlow`).
+
+#### UI-поток в `EmojiPickerDialog`
+
+```
+AlertDialog
+├── OutlinedTextField (поиск, Icons.Search, кнопка Clear)
+└── if (isSearching)
+    ├── LazyVerticalGrid(searchResults)   // категории и недавние скрыты
+    └── "Эмодзи не найдены" при пустом результате
+    else
+    ├── "Недавние" + LazyRow(recentEmojis)  // только если не пусто
+    ├── LazyRow(categories → FilterChip)
+    └── LazyVerticalGrid(selectedCategory.emojis)
+```
+
+- Секция недавних **не рендерится**, если список пуст — не засоряет UI.
+- Пустой результат поиска → `R.string.no_emojis_found`.
+- Кнопка «Без эмодзи» (`onEmojiSelected(null)`) работает из любого режима.
 
 ## 📎 Подсистема вложений (Attachments)
 
@@ -357,6 +445,11 @@ LaunchedEffect(Unit) {
 Настройки разделены на две зоны ответственности:
 1.  **Тема** — хранится в `DataStore<Preferences>` (`SettingsRepository`). Читается через `ThemeViewModel` в `MainActivity` (реактивно).
 2.  **Язык** — единый источник правды `AppCompatDelegate.getApplicationLocales()`. Выбор применяется через `AppLanguage.apply()`.
+
+> **DataStore используется и для не-настроечных данных:** `TagFilterRepository`
+> (фильтры тегов по модулям) и `RecentEmojiRepository` (недавние эмодзи).
+> Это осознанный выбор — оба набора данных маленькие, пользовательские
+> и переживают перезапуск; Room для них избыточен.
 
 ### UI в стиле Material 3 Expressive
 - Группы настроек обёрнуты в `Card` с `RoundedCornerShape(28.dp)`.
@@ -467,6 +560,28 @@ sequenceDiagram
     Save-->>TagDao: UPDATE tags SET ...
 ```
 
+### Выбор эмодзи с поиском и недавними
+```mermaid
+sequenceDiagram
+    participant Dlg as CreateTagDialog
+    participant Pkr as EmojiPickerDialog
+    participant VM as EmojiPickerViewModel
+    participant Store as RecentEmojiRepository (DataStore)
+    participant Cat as EmojiCatalog
+
+    Dlg->>Pkr: open()
+    Store-->>VM: Flow<List<String>> (последние 20)
+    VM-->>Pkr: recentEmojis: StateFlow<List<String>>
+    Pkr->>Cat: search("серд", categoryNames)
+    Cat-->>Pkr: ["❤️","🧡","💛", ...]
+    Note over Pkr: сетка результатов, категории скрыты
+    Pkr->>VM: onEmojiSelected("❤️")
+    VM->>Store: addRecentEmoji("❤️")
+    Store-->>VM: Flow emits ["❤️", ...rest]
+    Pkr->>Dlg: onEmojiSelected("❤️")
+    Note over Store: при следующем открытии ❤️ уже первый в "Недавних"
+```
+
 ## 🧭 Ключевые архитектурные решения
 
 | Решение                                                                      | Обоснование                                                                                                   |
@@ -490,6 +605,11 @@ sequenceDiagram
 | **`datesWithEvents` из отфильтрованного списка**                             | Точки-индикаторы в календаре автоматически сужаются под фильтр, без дублирования логики.                      |
 | **`TagEditViewModel` отдельно от экрана**                                    | Диалог редактирования тега можно открыть из любого места (Notes/Tasks/Calendar) с идентичным UX.              |
 | **`TagUsage` из 3 `COUNT(*)` в `TagDao`**                                    | Один SQL-запрос вместо трёх последовательных; junction-таблицы уже проиндексированы по `tagId`.               |
+| **`EmojiCatalog.search(query, categoryNames)` — чистая функция**             | Тестируется без Compose/Context; `object` остаётся свободным от Android-зависимостей.                          |
+| **Поиск по 4 каналам (символ / keywords ru+en / Unicode-имя / категория)**   | Максимальный охват без ручного описания каждого эмодзи; Unicode-имя — fallback для «забытых» ключевых слов.    |
+| **`RecentEmojiRepository` на DataStore**                                     | 20 последних эмодзи переживают перезапуск; `@Singleton` + `Flow` дают реактивное обновление UI без ручного refresh. |
+| **`EmojiPickerViewModel` отдельно от `EmojiPickerDialog`**                   | Диалог остаётся переиспользуемым; логика недавних изолирована и не течёт в `CreateTagDialog`.                  |
+| **Секция «Недавние» рендерится только при непустом списке**                  | Не засоряет UI у нового пользователя; не требует дополнительных условий в родительских экранах.                |
 | **Адаптивные лейауты (`NavigationSuiteScaffold`, `ListDetailPaneScaffold`)** | Соответствие гайдлайнам Google для телефонов, планшетов и Chromebook.                                         |
 | **M3 Expressive (`Card`, `ListItem`)**                                       | Современный вид без alpha-зависимостей.                                                                       |
 | **`@StringRes` в ViewModel**                                                 | Snackbar-сообщения локализуются без утечек `Context`.                                                         |
@@ -508,6 +628,8 @@ sequenceDiagram
 - [x] **Счётчик выбранных тегов** в `TopAppBar` — `FilterBadgeIcon` + `Badge`.
 - [x] **Редактирование существующих тегов** — `CreateTagDialog(initialTag = …)`, `TagPickerDialog.onEditTag`, `TagEditViewModel`.
 - [x] **Счётчик использования тега** — `TagDao.getTagUsage(tagId)` + `TagUsage` в диалоге редактирования.
+- [x] **Поиск по эмодзи в `EmojiPickerDialog`** — `EmojiCatalog.search()` (символ / keywords ru+en / Unicode-имя / категория), пустой результат → `no_emojis_found`.
+- [x] **Недавние эмодзи** — `RecentEmojiRepository` (`DataStore`, ключ `recent_emojis`, до 20, дедуп, свежие первыми), `EmojiPickerViewModel`, секция «Недавние» над категориями.
 - [x] Реализовать **адаптивный UI** (BottomBar/Rail, два пена на планшетах).
 - [x] Перевести UI на **Material 3 Expressive** + локализация (`ru`/`en`).
 - [x] Починить смену языка через **`AppCompatDelegate`**.
@@ -515,19 +637,17 @@ sequenceDiagram
 - [x] Добавить **подсистему вложений** (изображения + файлы, общая для Notes и Tasks).
 - [x] Внедрить **глобальную систему уведомлений** с фурсоной (`AppNotificationManager` + `FursonaSnackbar`).
 - [x] Добавить **пасхалку** и аватар разработчика в настройки.
-- [ ] Поиск по эмодзи в `EmojiPickerDialog`.
-- [ ] Недавние эмодзи (последние 20 в `DataStore`).
 - [ ] Просмотр вложений на весь экран (fullscreen viewer).
 - [ ] Камера как источник изображения (сейчас только галерея).
 - [ ] **Мультиверсионные заметки для соцсетей** — несколько версий одной
-    заметки, адаптированных под разные платформы. Возможная реализация:
-    отдельная сущность `NoteVariant` (`noteId`, `platform`, `title`,
-    `content`, `attachments`-override) + `@Relation` в `NoteModel`;
-    переключение версий в `NoteEditScreen` через чипы/таб.
+  заметки, адаптированных под разные платформы. Возможная реализация:
+  отдельная сущность `NoteVariant` (`noteId`, `platform`, `title`,
+  `content`, `attachments`-override) + `@Relation` в `NoteModel`;
+  переключение версий в `NoteEditScreen` через чипы/таб.
 - [ ] `ListDetailPaneScaffold` для Notes и Calendar (аналогично Tasks).
 - [ ] `MIGRATION_3_4` для `attachments` (сейчас `fallbackToDestructiveMigration`).
 - [ ] Модуляризация (feature-модули).
-- [ ] Unit-тесты для Use Cases и Repository (включая `AttachmentRepository`, `applyTagFilter`, `TagFilterRepositoryImpl`).
+- [ ] Unit-тесты для Use Cases и Repository (включая `AttachmentRepository`, `applyTagFilter`, `TagFilterRepositoryImpl`, `EmojiCatalog.search`, `RecentEmojiRepositoryImpl`).
 
 ## 📚 Полезные ссылки
 - [Guide to App Architecture (Google)](https://developer.android.com/topic/architecture)
@@ -544,3 +664,5 @@ sequenceDiagram
 - [Compose — FilterChip](https://developer.android.com/develop/ui/compose/components/chip#filter-chip)
 - [Compose — Badge](https://developer.android.com/develop/ui/compose/components/badge)
 - [Material 3 — Long press / combined gestures](https://developer.android.com/develop/ui/compose/touch-input/pointer-input/drag-swipe-fling)
+- [Character.getName — Unicode name](https://docs.oracle.com/javase/8/docs/api/java/lang/Character.html#getName-int-)
+- [Unicode emoji list](https://unicode.org/emoji/charts/full-emoji-list.html)

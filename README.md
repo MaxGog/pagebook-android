@@ -29,6 +29,7 @@ PageBook — это нативное Android-приложение для раб�
 - Превью вложений прямо в редакторе, скачивание в `Pictures`/`Downloads`
 - Создание задач прямо из заметок с автоматическим извлечением дат
 - **Цветные теги с эмодзи** — палитра из 7 цветов + каталог из 200+ эмодзи
+- **Поиск и недавние эмодзи** в пикере — по символу, ключевым словам (ru/en), Unicode-имени и категории; последние 20 сохраняются в `DataStore`
 - **Фильтрация списка по тегам** — ряд чипов над сеткой, OR/AND-логика, «Сбросить», badge с count
 
 ### ✅ Менеджер задач
@@ -66,6 +67,11 @@ PageBook — это нативное Android-приложение для раб�
 кастомизировать цветом (7 вариантов в стиле macOS) и **эмодзи из каталога
 на 200+ штук** в 10 категориях. Реализовано через many-to-many
 (junction-таблицы) в единой `PageBookDatabase`.
+
+**Выбор эмодзи** (`EmojiPickerDialog`):
+- **Поиск** — по самому символу, ключевым словам (ru/en), Unicode-имени и названию категории. Например, `"серд"` найдёт все сердца, `"работа"` — всю категорию Work.
+- **Недавние** — последние 20 использованных эмодзи в `DataStore` (`RecentEmojiRepository`), дедуплицируются, свежие — первыми. Секция появляется только когда список не пуст.
+- **Пустой результат** → «Эмодзи не найдены» (`no_emojis_found`).
 
 **Фильтрация списков** на всех трёх главных экранах — `TagFilterRow`:
 - **OR-логика** (по умолчанию): показываются элементы, у которых есть **хотя бы один** из выбранных тегов.
@@ -105,7 +111,9 @@ PageBook — это нативное Android-приложение для раб�
 - **🏷️ Tag filtering** — `TagFilterRow` (`FilterChip` + `FilterMode.OR/AND`) + `TagFilterRepository` (DataStore) + `applyTagFilter` (domain util)
 - **🔢 Tag usage** — `TagDao.getTagUsage(tagId)` (3 `COUNT(*)` по junction-таблицам)
 - **✏️ Tag editing** — `CreateTagDialog(initialTag = …)` + `TagEditViewModel`
-- **⚙️ DataStore Preferences** — хранение настроек (тема + фильтры тегов)
+- **🔎 Emoji search** — `EmojiCatalog.search()` (символ / keywords ru+en / `Character.getName` / категория), `no_emojis_found`
+- **🕘 Recent emojis** — `RecentEmojiRepository` (DataStore, до 20, дедуп) + `EmojiPickerViewModel` (`StateFlow`)
+- **⚙️ DataStore Preferences** — хранение настроек (тема + фильтры тегов + недавние эмодзи)
 - **🌐 AppCompatDelegate** — смена языка (per-app language preferences)
 - **🔄 Coroutines & Flow** — реактивное программирование + `Channel` для one-shot событий
 - **🧩 Hilt** — внедрение зависимостей (`@Binds` + `@Provides`)
@@ -122,25 +130,27 @@ graph TD
    A[UI Layer<br/>Compose + ViewModel + UiState] --> B[Domain Layer<br/>Use Cases + доменные модели]
    B --> C[Data Layer<br/>Repository Impl + Mappers + Room + DataStore + FileStore]
    C --> D[(PageBookDatabase - Room<br/>notes, tasks, events, tags, cross-refs, attachments)]
-   C --> F[(DataStore<br/>theme + tag filters)]
+   C --> F[(DataStore<br/>theme + tag filters + recent emojis)]
    C --> G[(filesDir/attachments<br/>app-private)]
    
    A -.->|AppNotificationManager| H[Global Snackbar<br/>FursonaSnackbar]
    A -.->|TagFilterState| I[TagFilterRow<br/>FilterChip + OR/AND]
    A -.->|FilterBadgeIcon| J[Badge count<br/>in TopAppBar]
+   A -.->|EmojiPickerViewModel| K[EmojiPickerDialog<br/>search + recent]
    C -.-> E[(Remote - Future)]
 ```
 
 ### Clean Architecture
-- **UI Layer**: Jetpack Compose + ViewModel + UiState (sealed interface / data class). Глобальный `Snackbar` управляется из `MainActivity` через `AppNotificationHost`. Состояние фильтра (`TagFilterState`) — часть UiState ViewModel.
-- **Domain Layer**: Use Cases, доменные модели (Note, Task, Event, Tag, TagColor, Attachment, TagFilterState, FilterMode, TagUsage), интерфейсы репозиториев, `applyTagFilter` (общая утилита).
-- **Data Layer**: Room, DAO, мапперы, реализации репозиториев, DataStore (`SettingsRepository`, `TagFilterRepositoryImpl`), файловое хранилище (`AttachmentFileStore`, `MediaStoreDownloader`), Hilt-модули.
+- **UI Layer**: Jetpack Compose + ViewModel + UiState (sealed interface / data class). Глобальный `Snackbar` управляется из `MainActivity` через `AppNotificationHost`. Состояние фильтра (`TagFilterState`) — часть UiState ViewModel. `EmojiPickerViewModel` изолирует логику недавних эмодзи от `CreateTagDialog`.
+- **Domain Layer**: Use Cases, доменные модели (Note, Task, Event, Tag, TagColor, Attachment, TagFilterState, FilterMode, TagUsage), интерфейсы репозиториев (`TagFilterRepository`, `RecentEmojiRepository`), `applyTagFilter` (общая утилита).
+- **Data Layer**: Room, DAO, мапперы, реализации репозиториев, DataStore (`SettingsRepository`, `TagFilterRepositoryImpl`, `RecentEmojiRepositoryImpl`), файловое хранилище (`AttachmentFileStore`, `MediaStoreDownloader`), Hilt-модули.
 - **Core Layer**: `AppNotificationManager` (синглтон для событий UI).
 
 Все три модуля — **Notes**, **Tasks**, **Calendar** — полностью на Clean Architecture.
 Теги работают сквозь все три модуля через единую `PageBookDatabase`,
 включая **фильтрацию** (OR/AND, persist, badge), **редактирование** и **счётчик использования**.
 Вложения — полиморфная связь (`ownerType` + `ownerId`) через общую таблицу.
+Эмодзи-пикер — отдельный переиспользуемый компонент с **поиском** (4 канала) и **недавними** (DataStore).
 
 Подробнее см. в [ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -183,7 +193,8 @@ app/src/main/java/ru/maxgog/pagebook/
 │   ├── mapper/         # NoteMapper, TaskMapper, EventMapper, TagMapper,
 │   │                   #   AttachmentMapper
 │   ├── repository/     # *RepositoryImpl, SettingsRepository,
-│   │                   #   TagFilterRepositoryImpl (DataStore)
+│   │                   #   TagFilterRepositoryImpl (DataStore),
+│   │                   #   RecentEmojiRepositoryImpl (DataStore)
 │   └── di/             # DatabaseModule, RepositoryModule, DataStoreModule,
 │                       #   AttachmentsModule
 ├── domain/
@@ -192,7 +203,7 @@ app/src/main/java/ru/maxgog/pagebook/
 │   │                   #   TagFilterState, FilterMode, TagFilterModule, TagUsage
 │   ├── repository/     # NoteRepository, TaskRepository, EventRepository,
 │   │                   #   TagRepository, TagFilterRepository,
-│   │                   #   AttachmentRepository (интерфейсы)
+│   │                   #   RecentEmojiRepository, AttachmentRepository (интерфейсы)
 │   ├── usecase/
 │   │   ├── note/       # GetAllNotesUseCase, SaveNoteUseCase, ...
 │   │   ├── task/       # GetAllTasksUseCase, SaveTaskUseCase,
@@ -215,7 +226,8 @@ app/src/main/java/ru/maxgog/pagebook/
 │   │                   #   TagPickerDialog (onEditTag),
 │   │                   #   TagFilterRow (+mode toggle),
 │   │                   #   FilterBadgeIcon, TagEditViewModel,
-│   │                   #   EmojiCatalog, EmojiPickerDialog,
+│   │                   #   EmojiCatalog (+keywords + search()), EmojiPickerDialog,
+│   │                   #   EmojiPickerViewModel (recent emojis),
 │   │                   #   OverflowMenu, AttachmentPreviewList,
 │   │                   #   AttachmentImageLoader, AttachmentPicker,
 │   │                   #   ResizeImageDialog
@@ -243,6 +255,7 @@ app/src/main/java/ru/maxgog/pagebook/
 | **Settings** ⚙️      | Тема (System/Light/Dark), язык (ru/en), **пасхалка с фурсоной**, **аватар разработчика**                                                          | Compose, DataStore, AppCompat                  |
 | **Notifications** 🔔 | Глобальные уведомления (SUCCESS/ERROR/INFO/EASTER_EGG) с аватаром-фурсоной, выходящим за края `Snackbar`                                          | Compose, Channel, Hilt                         |
 | **Tags** 🏷️          | Сквозные теги: 7 цветов macOS + **200+ эмодзи**, **фильтр OR/AND + persist + badge**, **редактирование**, **счётчик использования**               | Room (@Relation + @Junction), Hilt, FilterChip |
+| **Emoji picker** 🔎  | Каталог 200+ эмодзи в 10 категориях, **поиск** (символ / keywords ru+en / Unicode-имя / категория), **недавние** (20, DataStore)                   | Compose, DataStore, Hilt, `Character.getName`  |
 | **Attachments** 📎   | App-private storage + MediaStore, Photo Picker, `@Update` для pending, `<img>` в rich-text                                                        | Room, ContentResolver, LocalImageLoader        |
 
 ## 🏷️ Фильтрация по тегам
@@ -270,6 +283,29 @@ app/src/main/java/ru/maxgog/pagebook/
 - **`TagChip.onEdit`** — иконка карандаша в `trailingIcon` (показывается только если передан колбэк).
 - **`TagPickerDialog.onEditTag`** — опциональный колбэк, открывает диалог редактирования поверх пикера.
 - **`TagDao.getTagUsage(tagId)`** — один SQL-запрос с 3 `COUNT(*)` по junction-таблицам `note_tag_cross_ref` / `task_tag_cross_ref` / `event_tag_cross_ref`.
+
+## 🔎 Emoji picker: поиск и недавние
+
+`EmojiPickerDialog` (`ui/components/`) — общий компонент выбора эмодзи
+(сейчас используется в `CreateTagDialog`), с двумя новыми фичами поверх
+каталога по категориям.
+
+### Поиск
+- Строка `OutlinedTextField` вверху диалога. Пока она не пуста —
+  категории-чипы и «Недавние» **скрываются**, показывается только сетка результатов.
+- `EmojiCatalog.search(query, categoryNames)` — чистая функция, 4 канала матчинга:
+    1. **Сам символ** — вставьте `🎯` руками;
+    2. **Ключевые слова** `ru/en` из `Map<String, List<String>> keywords` — `"серд"` → все сердца, `"работа"` → 💼;
+    3. **Unicode-имя** через `Character.getName(codePoint)` — fallback, покрывает даже те эмодзи, для которых нет ключевых слов (`"grinning"`, `"face"`);
+    4. **Название категории** — `categoryNames` (уже локализованы через `stringResource`) → запрос `"работа"` тянет всю категорию Work.
+- **Пустой результат** → `no_emojis_found` («Эмодзи не найдены»).
+
+### Недавние
+- **`RecentEmojiRepository`** (`@Singleton`, DataStore Preferences) — `Flow<List<String>>` + `addRecentEmoji(emoji)`.
+- Ключ `recent_emojis`, разделитель `|` (безопасен для эмодзи), **до 20** записей, **дедупликация** (выбранный — в начало).
+- **`EmojiPickerViewModel`** (`@HiltViewModel`) — `recentEmojis: StateFlow<List<String>>` (WhileSubscribed(5_000)).
+- При выборе любого эмодзи (из «Недавних», категории или поиска) — `viewModel.onEmojiSelected(emoji)` **перед** `onEmojiSelected(...)`, поэтому список обновится к следующему открытию.
+- Секция «Недавние» рендерится **только когда список не пуст** — не засоряет UI у нового пользователя.
 
 ## 🔔 Система уведомлений
 
@@ -322,6 +358,8 @@ app/src/main/java/ru/maxgog/pagebook/
 - [x] **Счётчик выбранных тегов** в `TopAppBar` — `FilterBadgeIcon` + `Badge`
 - [x] **Редактирование существующих тегов** — `CreateTagDialog(initialTag = …)`, `TagPickerDialog.onEditTag`, `TagEditViewModel`
 - [x] **Счётчик использования тега** — `TagDao.getTagUsage(tagId)` в диалоге редактирования
+- [x] **Поиск по эмодзи** в `EmojiPickerDialog` — `EmojiCatalog.search()`, 4 канала (символ / keywords ru+en / Unicode-имя / категория)
+- [x] **Недавние эмодзи** — `RecentEmojiRepository` (DataStore, до 20, дедуп), `EmojiPickerViewModel`, секция «Недавние»
 - [x] **UI для создания задач из заметок** 🤖 (кнопка `AddTask` в `NoteEditScreen`)
 - [x] **Material 3 Expressive** (настройки, карточки, `OverflowMenu`)
 - [x] **Адаптивный UI** (`NavigationSuiteScaffold`, `ListDetailPaneScaffold`)
@@ -331,22 +369,20 @@ app/src/main/java/ru/maxgog/pagebook/
 - [x] **Глобальная система уведомлений** (кастомный `Snackbar` с фурсоной)
 - [x] **Пасхалка** (7 тапов по версии) и аватар разработчика в настройках
 - [x] **Смена языка на Android < 13** (требуется `AppCompatActivity`)
-- [ ] **Поиск по эмодзи** в `EmojiPickerDialog`
-- [ ] **Недавние эмодзи** (последние 20 в `DataStore`)
 - [ ] **Fullscreen-просмотр вложений** по тапу на превью
 - [ ] **Камера как источник изображения** (сейчас только галерея + документы)
 - [ ] **`ListDetailPaneScaffold` для Notes и Calendar** (аналогично Tasks)
 - [ ] **Мультиверсионные заметки для соцсетей** — одна заметка с несколькими
-    «адаптациями» под разные платформы. Сценарий для художника: написал
-    пост в заметке → переключился на версию для другой соцсети и слегка
-    подправил текст/форматирование/вложения под её формат.
+  «адаптациями» под разные платформы. Сценарий для художника: написал
+  пост в заметке → переключился на версию для другой соцсети и слегка
+  подправил текст/форматирование/вложения под её формат.
 - [ ] **`MIGRATION_3_4`** для `attachments` (сейчас `fallbackToDestructiveMigration`)
 - [ ] **Синхронизация с облаком** ☁️
 - [ ] **Виджеты для главного экрана** 🏠
 - [ ] **Резервное копирование** 💾
 - [ ] **Голосовые заметки** 🎤
 - [ ] **Модуляризация** (feature-модули)
-- [ ] **Unit-тесты** для Use Cases и Repository (включая `AttachmentRepository`, `applyTagFilter`, `TagFilterRepositoryImpl`)
+- [ ] **Unit-тесты** для Use Cases и Repository (включая `AttachmentRepository`, `applyTagFilter`, `TagFilterRepositoryImpl`, `EmojiCatalog.search`, `RecentEmojiRepositoryImpl`)
 - [ ] **WorkManager** для напоминаний о задачах
 - [ ] **Kotlin Multiplatform** для общей бизнес-логики
 

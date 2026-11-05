@@ -6,11 +6,13 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import ru.maxgog.pagebook.data.repository.EventRepositoryImpl
 import ru.maxgog.pagebook.data.repository.NoteRepositoryImpl
+import ru.maxgog.pagebook.data.repository.RecentEmojiRepositoryImpl
 import ru.maxgog.pagebook.data.repository.TagFilterRepositoryImpl
 import ru.maxgog.pagebook.data.repository.TaskRepositoryImpl
 import ru.maxgog.pagebook.data.repository.TagRepositoryImpl
 import ru.maxgog.pagebook.domain.repository.EventRepository
 import ru.maxgog.pagebook.domain.repository.NoteRepository
+import ru.maxgog.pagebook.domain.repository.RecentEmojiRepository
 import ru.maxgog.pagebook.domain.repository.TagFilterRepository
 import ru.maxgog.pagebook.domain.repository.TagRepository
 import ru.maxgog.pagebook.domain.repository.TaskRepository
@@ -39,4 +41,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindTagFilterRepository(impl: TagFilterRepositoryImpl): TagFilterRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindRecentEmojiRepository(impl: RecentEmojiRepositoryImpl): RecentEmojiRepository
 }

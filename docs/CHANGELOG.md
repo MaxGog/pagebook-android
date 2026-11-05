@@ -130,7 +130,7 @@
       tagsOf: (T) -> List<Tag>
   ): List<T>
   ```
-Устраняет дублирование OR/AND между тремя ViewModel, тестируется один раз.
+  Устраняет дублирование OR/AND между тремя ViewModel, тестируется один раз.
 - **`FilterMode.OR` / `FilterMode.AND`** в фильтре:
   - **OR** (по умолчанию) — сущность проходит, если есть **хотя бы один**
     из выбранных тегов;
@@ -161,6 +161,52 @@
   - **`GetTagUsageUseCase`** (`domain/usecase/tag/`).
   - Отображается в `CreateTagDialog` как
     `Заметок: N · Задач: N · Событий: N`.
+
+**Emoji picker — поиск по эмодзи**
+- **`EmojiCatalog.search(query, categoryNames)`** (`ui/components/EmojiCatalog.kt`) —
+  чистая функция без Compose/Context, тестируется без Android-зависимостей.
+- **4 канала матчинга** одновременно:
+  1. **Сам символ** — пользователь может вставить `🎯` из буфера обмена.
+  2. **Ключевые слова** `ru/en` из `Map<String, List<String>> keywords` —
+     `"серд"` → все сердца, `"работа"` → 💼, `"cat"` → 🐱 (если появится).
+  3. **Unicode-имя** через `Character.getName(codePoint)` — fallback,
+     покрывает даже эмодзи без явных ключевых слов (`"grinning"`, `"face"`).
+  4. **Название категории** — `categoryNames` передаются с UI
+     (`stringResource(cat.nameRes)`), поэтому запрос `"работа"` тянет
+     всю категорию Work.
+- **Поле поиска** (`OutlinedTextField` с `Icons.Default.Search` и кнопкой
+  `Clear`) вверху `EmojiPickerDialog`. Пока поле не пусто —
+  категории-чипы и «Недавние» **скрываются**, показывается только сетка
+  результатов.
+- **Пустой результат** → новая строка `R.string.no_emojis_found`
+  («Эмодзи не найдены» / «No emojis found»).
+
+**Emoji picker — недавние эмодзи**
+- **`RecentEmojiRepository`** (Domain, interface) — `getRecentEmojis(): Flow<List<String>>`
+  + `addRecentEmoji(emoji)`.
+- **`RecentEmojiRepositoryImpl`** (Data, `@Singleton`, Hilt) на `DataStore<Preferences>`:
+  - ключ `recent_emojis`, сериализация через `joinToString("|")`
+    (разделитель безопасен — эмодзи не содержат `|`);
+  - **до 20** записей, **дедупликация** (выбранный эмодзи перемещается
+    в начало), свежие — первыми.
+- **`EmojiPickerViewModel`** (`ui/components/`, `@HiltViewModel`):
+  ```kotlin
+  val recentEmojis: StateFlow<List<String>> = recentEmojiRepository
+      .getRecentEmojis()
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+  fun onEmojiSelected(emoji: String) {
+      viewModelScope.launch { recentEmojiRepository.addRecentEmoji(emoji) }
+  }
+  ```
+- **Секция «Недавние»** над категориями в `EmojiPickerDialog` (заголовок
+  `R.string.recent_emojis` + `LazyRow`). Секция **не рендерится**,
+  если список пуст — не засоряет UI у нового пользователя.
+- При выборе любого эмодзи (из «Недавних», категории или поиска) —
+  `viewModel.onEmojiSelected(emoji)` **перед** `onEmojiSelected(emoji)`,
+  поэтому список обновится к следующему открытию пикера.
+- Новые строки (`strings.xml` ru/en): `search_emoji`, `recent_emojis`,
+  `no_emojis_found`.
 
 **Attachments — вложения для Notes и Tasks**
 - **Domain-модели**: `Attachment` (`id`, `ownerType`, `ownerId`, `type`,
@@ -266,18 +312,23 @@
 **Документация**
 - `ARCHITECTURE.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `README.md` (актуализированы).
 - **`ARCHITECTURE.md`**: подразделы **«🔍 Фильтрация списков по тегам»**
-  (TagFilterRow, OR/AND, persist, badge) и **«✏️ Редактирование тегов
+  (TagFilterRow, OR/AND, persist, badge), **«✏️ Редактирование тегов
   и счётчик использования»** (CreateTagDialog в режиме edit, TagEditViewModel,
-  TagUsage), новые mermaid-диаграммы «Фильтрация списка по тегу (persist + OR/AND)»
-  и «Редактирование тега с usage», обновлены «Ключевые архитектурные решения»
-  и roadmap.
-- **`README.md`**: раздел «🏷️ Сквозные теги: полный цикл», новый раздел
-  «✏️ Редактирование тегов и счётчик использования», обновлённый стек
-  (Tag filtering / Tag usage / Tag editing), `FilterBadgeIcon` /
-  `TagFilterRepositoryImpl` / `TagEditViewModel` в структуре проекта,
+  TagUsage) и **«🔎 Emoji picker: поиск и недавние»** (4 канала матчинга,
+  `RecentEmojiRepository` на DataStore, UI-поток); новые mermaid-диаграммы
+  «Фильтрация списка по тегу (persist + OR/AND)», «Редактирование тега
+  с usage» и «Выбор эмодзи с поиском и недавними»; обновлены «Ключевые
+  архитектурные решения» (4 новые строки про emoji search/recent) и roadmap.
+- **`README.md`**: раздел «🏷️ Сквозные теги: полный цикл» (плюс блок
+  «Выбор эмодзи» про поиск и недавних), новый раздел «✏️ Редактирование
+  тегов и счётчик использования», **новый раздел «🔎 Emoji picker:
+  поиск и недавние»**, обновлённый стек (Tag filtering / Tag usage /
+  Tag editing / Emoji search / Recent emojis), `EmojiPickerViewModel` /
+  `RecentEmojiRepositoryImpl` / `EmojiCatalog.search` в структуре проекта,
   новые пункты в roadmap.
 - **`CHANGELOG.md`**: добавлены блоки про persist / OR-AND / badge /
-  edit / usage, пять пунктов перенесены из `Planned` в `Added`.
+  edit / usage / emoji search / recent emojis, соответствующие пункты
+  перенесены из `Planned` в `Added`.
 
 ### Changed
 
@@ -292,7 +343,8 @@
 **Data Layer**
 - **Репозитории** разделены на интерфейс (`domain/repository/`) и реализацию (`data/repository/`).
 - **Hilt**: единый **`RepositoryModule`** с `@Binds` + отдельный **`AttachmentsModule`**
-  (`@Binds AttachmentRepository`). Добавлен `@Binds TagFilterRepository`.
+  (`@Binds AttachmentRepository`). Добавлены `@Binds TagFilterRepository`
+  и **`@Binds RecentEmojiRepository`**.
 - **`NoteDao` / `TaskDao` / `EventDao`**: добавлены `@Transaction getAllWithTags()`,
   `getWithTagsById()`; `insert()` возвращает `Long`; сортировки (`AtCreated DESC`,
   `IsCompleted ASC, AtCreated DESC`, `date ASC, time ASC`).
@@ -307,7 +359,12 @@
 - **`SettingsRepository`**: убран `LANGUAGE_KEY`, `language: Flow<...>`,
   `setLanguage()` — язык теперь хранится **только** в `AppCompatDelegate`.
 - **`DataStore<Preferences>`** теперь хранит **и тему, и фильтры тегов**
-  (`tag_filter_<module>_ids` / `tag_filter_<module>_mode`).
+  (`tag_filter_<module>_ids` / `tag_filter_<module>_mode`),
+  **и недавние эмодзи** (`recent_emojis`).
+- **`EmojiCatalog`** (`ui/components/`) — добавлены `Map<String, List<String>> keywords`
+  (покрытие всех эмодзи каталога на `ru`/`en`), `fun search(query, categoryNames): List<String>`
+  и приватный `unicodeName(emoji): String?` (через `Character.getName`).
+  `object` остаётся свободным от Compose/Android-зависимостей.
 
 **UI**
 - **Экраны** используют `contentPadding` вместо `Modifier.padding` (edge-to-edge).
@@ -343,8 +400,17 @@
   корректной работы `.catch { emit(Error(...)) }`.
 - **`CalendarViewModel`**: `filterState` добавлен 4-м источником в `combine`;
   `datesWithEvents` вычисляется из отфильтрованного списка.
+- **`EmojiPickerDialog`** (`ui/components/`) — переработан:
+  - добавлен `EmojiPickerViewModel` (`hiltViewModel()`) для недавних;
+  - `OutlinedTextField` поиска + `Icons.Default.Search` / `Clear`;
+  - `if (isSearching)` — сетка `searchResults`, иначе — секция «Недавние»
+    (если не пусто) + категории + сетка категории;
+  - приватный `EmojiCell` (`Box` 44dp + `Text` 26sp) — переиспользуется
+    и в недавних, и в поиске, и в категориях;
+  - сигнатура Composable не изменилась (`onDismiss`, `onEmojiSelected`),
+    `CreateTagDialog` менять не нужно — `hiltViewModel()` подхватит VM из графа.
 
-  **Notifications**
+**Notifications**
 - Единая система внутренних уведомлений `AppNotificationManager` (Hilt `@Singleton`)
   на `Channel` + `SharedFlow`-подобный API (`success/error/info/easterEgg`).
 - Кастомный `FursonaSnackbar` с аватаром-фурсоной и цветовыми типами
@@ -362,17 +428,22 @@
 - Добавлены для фильтрации: `no_matching_items`, `clear_filters`,
   `filter_tags`, `filter_mode_or_desc`, `filter_mode_and_desc`.
 - Добавлены для редактирования тегов: `edit_tag`, `tag_usage_format`.
+- **Добавлены для emoji picker**: `search_emoji` («Поиск эмодзи» / «Search emoji»),
+  `recent_emojis` («Недавние» / «Recent»), `no_emojis_found`
+  («Эмодзи не найдены» / «No emojis found»).
 
 **Документация**
 - `ARCHITECTURE.md`: добавлены разделы «Адаптивный UI», «One-Shot Events»,
   «Настройки (DataStore + AppCompatDelegate)», **«Подсистема вложений (Attachments)»**,
   **«Фильтрация списков по тегам»** (persist, OR/AND, badge),
-  **«Редактирование тегов и счётчик использования»**, обновлены диаграммы
-  (sequence для attach, фильтрации, редактирования тега), БД (`version = 4`,
-  8 сущностей), roadmap.
+  **«Редактирование тегов и счётчик использования»**,
+  **«🔎 Emoji picker: поиск и недавние»**; обновлены диаграммы (sequence для
+  attach, фильтрации, редактирования тега, **выбора эмодзи**), БД
+  (`version = 4`, 8 сущностей), roadmap.
 - `README.md`: обновлены стек (Adaptive, M3 Expressive, Attachments,
-  Tag filtering / Tag usage / Tag editing), новые разделы «🏷️ Фильтрация
-  по тегам» и «✏️ Редактирование тегов и счётчик использования», roadmap.
+  Tag filtering / Tag usage / Tag editing, **Emoji search / Recent emojis**),
+  новые разделы «🏷️ Фильтрация по тегам», «✏️ Редактирование тегов
+  и счётчик использования» и **«🔎 Emoji picker: поиск и недавние»**, roadmap.
 - `CHANGELOG.md`: актуализирован.
 - `CONTRIBUTING.md`: добавлен подраздел про «ловушку» с `localPath`.
 
@@ -474,12 +545,27 @@
   с `Type inference failed`. Исправлено однократной конвертацией
   `day.date.toKotlinxLocalDate()` в `dayContent`.
 
+**Emoji picker**
+- **Поиск чувствителен к локали** — `EmojiCatalog.search()` приводит
+  и запрос, и ключевые слова к `lowercase()` (без `Locale.getDefault()`,
+  чтобы не зависеть от системной локали — кириллица корректно работает
+  в `ru`/`en`).
+- **`Character.getName` падает на не-эмодзи** — обёрнут в `try/catch`
+  (`IllegalArgumentException`), возвращает `null`, поиск по Unicode-имени
+  просто не срабатывает для этого символа.
+- **Разделитель в DataStore** — выбран `|`, а не `,`/`;`, т.к. эмодзи
+  гарантированно не содержат `|`. Это исключает «разваливание» списка
+  на неверные токены и появление «фантомных» эмодзи в секции «Недавние».
+
 ### Planned
-- **Поиск по эмодзи** в `EmojiPickerDialog`.
-- **Недавние эмодзи** (последние 20 в `DataStore`).
+- **Удаление из недавних эмодзи** — long-press на эмодзи в секции «Недавние»
+  (`removeRecentEmoji(emoji)` в репозитории).
+- **Кнопка «Очистить недавние»** рядом с секцией (аналог `clear_filters`).
 - **`ListDetailPaneScaffold` для Notes и Calendar** (аналогично Tasks).
 - **Fullscreen-просмотр вложений** по тапу на превью.
 - **Камера как источник изображения** (сейчас только галерея + документы).
+- **Мультиверсионные заметки для соцсетей** — несколько версий одной заметки
+  под разные платформы (`NoteVariant`).
 - **`MIGRATION_3_4`** для `attachments` (сейчас `fallbackToDestructiveMigration`).
 - Синхронизация с облаком.
 - Виджеты для главного экрана.
@@ -487,7 +573,8 @@
 - Голосовые заметки.
 - Модуляризация (feature-модули).
 - Unit-тесты для Use Cases и Repository (в т.ч. `AttachmentRepository`,
-  `applyTagFilter`, `TagFilterRepositoryImpl`).
+  `applyTagFilter`, `TagFilterRepositoryImpl`, **`EmojiCatalog.search`**,
+  **`RecentEmojiRepositoryImpl`**).
 - WorkManager для напоминаний о задачах.
 - Настройка `room.schemaLocation` (Room Gradle plugin уже подключён).
 
