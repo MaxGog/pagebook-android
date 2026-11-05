@@ -242,10 +242,10 @@ fun clearTagFilter() = viewModelScope.launch {
 
 `CreateTagDialog` работает в двух режимах:
 
-| Режим | `initialTag` | Заголовок | Кнопка подтверждения | Usage |
-|:---|:---|:---|:---|:---|
-| Создание | `null` | `new_tag` | `create` | — |
-| Редактирование | `Tag` | `edit_tag` | `save` | `tag_usage_format` («Заметок: N · Задач: N · Событий: N») |
+| Режим          | `initialTag` | Заголовок  | Кнопка подтверждения | Usage                                                     |
+|:---------------|:-------------|:-----------|:---------------------|:----------------------------------------------------------|
+| Создание       | `null`       | `new_tag`  | `create`             | —                                                         |
+| Редактирование | `Tag`        | `edit_tag` | `save`               | `tag_usage_format` («Заметок: N · Задач: N · Событий: N») |
 
 - **`TagEditViewModel`** (`ui/components/`) — `@HiltViewModel`, отдельный от
   родительского экрана. При `initialTag != null` подгружает `TagUsage`
@@ -483,13 +483,13 @@ sequenceDiagram
 | **`localPath` — относительный путь**                                         | Отвязка от абсолютного `filesDir` (меняется между установками/бэкапами).                                      |
 | **`@Update` для pending-вложений**                                           | Избегаем `SQLiteConstraintException` при повторном `insert` с тем же `id`.                                    |
 | **`TagFilterRepository` на DataStore**                                       | Фильтр переживает перезапуск; каждый модуль (`NOTES`/`TASKS`/`CALENDAR`) помнит свой `tagIds + mode`.         |
-| **`TagFilterState(tagIds, mode)` в Domain**                                  | Тип-безопасное представление фильтра; легко расширять (например, `FilterMode.NOT`), не ломая ViewModel.     |
+| **`TagFilterState(tagIds, mode)` в Domain**                                  | Тип-безопасное представление фильтра; легко расширять (например, `FilterMode.NOT`), не ломая ViewModel.       |
 | **`applyTagFilter` — общая утилита в `domain/util`**                         | Устраняет дублирование OR/AND между тремя ViewModel; тестируется один раз.                                    |
 | **Long-press на `TagChip` + `AssistChip` OR/AND**                            | Два пути переключения режима: быстрый (long-press) и явный (чип) для новичков.                                |
 | **`FilterBadgeIcon` в `TopAppBar`**                                          | Показывает `count`, а не весь ряд фильтров, — экономит вертикальное место, когда фильтр не активен.           |
 | **`datesWithEvents` из отфильтрованного списка**                             | Точки-индикаторы в календаре автоматически сужаются под фильтр, без дублирования логики.                      |
 | **`TagEditViewModel` отдельно от экрана**                                    | Диалог редактирования тега можно открыть из любого места (Notes/Tasks/Calendar) с идентичным UX.              |
-| **`TagUsage` из 3 `COUNT(*)` в `TagDao`**                                    | Один SQL-запрос вместо трёх последовательных; junction-таблицы уже проиндексированы по `tagId`.                |
+| **`TagUsage` из 3 `COUNT(*)` в `TagDao`**                                    | Один SQL-запрос вместо трёх последовательных; junction-таблицы уже проиндексированы по `tagId`.               |
 | **Адаптивные лейауты (`NavigationSuiteScaffold`, `ListDetailPaneScaffold`)** | Соответствие гайдлайнам Google для телефонов, планшетов и Chromebook.                                         |
 | **M3 Expressive (`Card`, `ListItem`)**                                       | Современный вид без alpha-зависимостей.                                                                       |
 | **`@StringRes` в ViewModel**                                                 | Snackbar-сообщения локализуются без утечек `Context`.                                                         |
@@ -519,6 +519,11 @@ sequenceDiagram
 - [ ] Недавние эмодзи (последние 20 в `DataStore`).
 - [ ] Просмотр вложений на весь экран (fullscreen viewer).
 - [ ] Камера как источник изображения (сейчас только галерея).
+- [ ] **Мультиверсионные заметки для соцсетей** — несколько версий одной
+    заметки, адаптированных под разные платформы. Возможная реализация:
+    отдельная сущность `NoteVariant` (`noteId`, `platform`, `title`,
+    `content`, `attachments`-override) + `@Relation` в `NoteModel`;
+    переключение версий в `NoteEditScreen` через чипы/таб.
 - [ ] `ListDetailPaneScaffold` для Notes и Calendar (аналогично Tasks).
 - [ ] `MIGRATION_3_4` для `attachments` (сейчас `fallbackToDestructiveMigration`).
 - [ ] Модуляризация (feature-модули).

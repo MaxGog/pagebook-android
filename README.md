@@ -235,15 +235,15 @@ app/src/main/java/ru/maxgog/pagebook/
 
 ## 🧩 Функциональные возможности
 
-| Модуль             | Возможности                                                                                                                                  | Технологии                                     |
-|--------------------|----------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------|
-| **Notes** 📝       | Rich-text заметки, адаптивная сетка, ML Kit для извлечения дат, **теги с эмодзи**, **фильтрация по тегам (OR/AND, persist, badge)**, **вложения** | Compose, Room, RichEditor, ML Kit, PhotoPicker |
-| **Tasks** ✅       | Задачи с напоминаниями, связь с заметками (`noteId`), сортировка, **теги с эмодзи**, **фильтрация по тегам**, **вложения**                       | Compose, StateFlow, Room                       |
-| **Calendar** 🗓️    | События по датам, реактивное обновление, автоскролл, **теги с эмодзи**, **фильтрация (список + точки на днях)**                                  | Compose, kizitonwose Calendar, Room            |
-| **Settings** ⚙️    | Тема (System/Light/Dark), язык (ru/en), **пасхалка с фурсоной**, **аватар разработчика**                                                        | Compose, DataStore, AppCompat                  |
-| **Notifications** 🔔 | Глобальные уведомления (SUCCESS/ERROR/INFO/EASTER_EGG) с аватаром-фурсоной, выходящим за края `Snackbar`                                        | Compose, Channel, Hilt                         |
-| **Tags** 🏷️        | Сквозные теги: 7 цветов macOS + **200+ эмодзи**, **фильтр OR/AND + persist + badge**, **редактирование**, **счётчик использования**             | Room (@Relation + @Junction), Hilt, FilterChip |
-| **Attachments** 📎 | App-private storage + MediaStore, Photo Picker, `@Update` для pending, `<img>` в rich-text                                                      | Room, ContentResolver, LocalImageLoader        |
+| Модуль               | Возможности                                                                                                                                       | Технологии                                     |
+|----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------|
+| **Notes** 📝         | Rich-text заметки, адаптивная сетка, ML Kit для извлечения дат, **теги с эмодзи**, **фильтрация по тегам (OR/AND, persist, badge)**, **вложения** | Compose, Room, RichEditor, ML Kit, PhotoPicker |
+| **Tasks** ✅         | Задачи с напоминаниями, связь с заметками (`noteId`), сортировка, **теги с эмодзи**, **фильтрация по тегам**, **вложения**                        | Compose, StateFlow, Room                       |
+| **Calendar** 🗓️      | События по датам, реактивное обновление, автоскролл, **теги с эмодзи**, **фильтрация (список + точки на днях)**                                   | Compose, kizitonwose Calendar, Room            |
+| **Settings** ⚙️      | Тема (System/Light/Dark), язык (ru/en), **пасхалка с фурсоной**, **аватар разработчика**                                                          | Compose, DataStore, AppCompat                  |
+| **Notifications** 🔔 | Глобальные уведомления (SUCCESS/ERROR/INFO/EASTER_EGG) с аватаром-фурсоной, выходящим за края `Snackbar`                                          | Compose, Channel, Hilt                         |
+| **Tags** 🏷️          | Сквозные теги: 7 цветов macOS + **200+ эмодзи**, **фильтр OR/AND + persist + badge**, **редактирование**, **счётчик использования**               | Room (@Relation + @Junction), Hilt, FilterChip |
+| **Attachments** 📎   | App-private storage + MediaStore, Photo Picker, `@Update` для pending, `<img>` в rich-text                                                        | Room, ContentResolver, LocalImageLoader        |
 
 ## 🏷️ Фильтрация по тегам
 
@@ -336,6 +336,10 @@ app/src/main/java/ru/maxgog/pagebook/
 - [ ] **Fullscreen-просмотр вложений** по тапу на превью
 - [ ] **Камера как источник изображения** (сейчас только галерея + документы)
 - [ ] **`ListDetailPaneScaffold` для Notes и Calendar** (аналогично Tasks)
+- [ ] **Мультиверсионные заметки для соцсетей** — одна заметка с несколькими
+    «адаптациями» под разные платформы. Сценарий для художника: написал
+    пост в заметке → переключился на версию для другой соцсети и слегка
+    подправил текст/форматирование/вложения под её формат.
 - [ ] **`MIGRATION_3_4`** для `attachments` (сейчас `fallbackToDestructiveMigration`)
 - [ ] **Синхронизация с облаком** ☁️
 - [ ] **Виджеты для главного экрана** 🏠
