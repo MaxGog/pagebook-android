@@ -27,6 +27,7 @@ import com.mohamedrejeb.richeditor.model.RichTextState
 import com.mohamedrejeb.richeditor.model.rememberRichTextState
 import com.mohamedrejeb.richeditor.ui.material3.RichTextEditor
 import ru.maxgog.pagebook.R
+import ru.maxgog.pagebook.domain.model.Tag
 import ru.maxgog.pagebook.ui.components.AttachmentImageLoader
 import ru.maxgog.pagebook.ui.components.AttachmentPreviewList
 import ru.maxgog.pagebook.ui.components.CreateTagDialog
@@ -51,6 +52,7 @@ fun NoteEditScreen(
 
     var showTagPicker by remember { mutableStateOf(false) }
     var showCreateTag by remember { mutableStateOf(false) }
+    var editingTag by remember { mutableStateOf<Tag?>(null) }
     var showMoreMenu by remember { mutableStateOf(false) }
 
     val currentNote = (uiState as? NoteEditUiState.Editing)?.note
@@ -107,7 +109,6 @@ fun NoteEditScreen(
                         }
                     },
                     actions = {
-                        // 1) Save — primary
                         IconButton(
                             onClick = { viewModel.save(titleState, richTextState.toHtml()) },
                             enabled = saveEnabled
@@ -120,7 +121,6 @@ fun NoteEditScreen(
                             )
                         }
 
-                        // 2) Tags с badge
                         IconButton(onClick = { showTagPicker = true }) {
                             BadgedBox(
                                 badge = {
@@ -136,7 +136,6 @@ fun NoteEditScreen(
                             }
                         }
 
-                        // 3) Overflow — фото, файл, задача, удаление
                         Box {
                             IconButton(onClick = { showMoreMenu = true }) {
                                 Icon(
@@ -269,7 +268,6 @@ fun NoteEditScreen(
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
 
-                    // Теги + inline-кнопка «Добавить»
                     FlowRow(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -324,16 +322,44 @@ fun NoteEditScreen(
             allTags = allTags,
             selectedTags = currentTags,
             onToggle = viewModel::toggleTag,
-            onCreateTag = { showTagPicker = false; showCreateTag = true },
+            onCreateTag = {
+                showTagPicker = false
+                editingTag = null
+                showCreateTag = true
+            },
+            onEditTag = { tag ->
+                // Закрываем пикер, иначе два AlertDialog разом —
+                // на части устройств второй не покажется.
+                showTagPicker = false
+                editingTag = tag
+                showCreateTag = true
+            },
             onDismiss = { showTagPicker = false }
         )
     }
+
     if (showCreateTag) {
+        val tagBeingEdited = editingTag
         CreateTagDialog(
-            onDismiss = { showCreateTag = false },
-            onConfirm = { name, color, emoji ->
-                viewModel.createAndToggleTag(name, color, emoji)
+            initialTag = tagBeingEdited,
+            onDismiss = {
                 showCreateTag = false
+                editingTag = null
+            },
+            onConfirm = { name, color, emoji ->
+                if (tagBeingEdited != null) {
+                    viewModel.updateTag(
+                        tagBeingEdited.copy(
+                            name = name.trim(),
+                            colorHex = color.hex,
+                            emoji = emoji
+                        )
+                    )
+                } else {
+                    viewModel.createAndToggleTag(name, color, emoji)
+                }
+                showCreateTag = false
+                editingTag = null
             }
         )
     }

@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.maxgog.pagebook.R
+import ru.maxgog.pagebook.domain.model.Tag
 import ru.maxgog.pagebook.ui.components.AttachmentPreviewList
 import ru.maxgog.pagebook.ui.components.CreateTagDialog
 import ru.maxgog.pagebook.ui.components.DateTimePickerDialog
@@ -49,6 +50,7 @@ fun TaskEditScreen(
 
     var showTagPicker by remember { mutableStateOf(false) }
     var showCreateTag by remember { mutableStateOf(false) }
+    var editingTag by remember { mutableStateOf<Tag?>(null) }
     var showDateTimePicker by remember { mutableStateOf(false) }
     var showMoreMenu by remember { mutableStateOf(false) }
 
@@ -188,7 +190,6 @@ fun TaskEditScreen(
                     titleContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
-
         }
     ) { padding ->
         when {
@@ -248,7 +249,7 @@ fun TaskEditScreen(
                         onDownload = viewModel::downloadAttachment
                     )
                 }
-                
+
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -270,7 +271,6 @@ fun TaskEditScreen(
                     )
                 }
 
-                // Reminder card
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.large,
@@ -375,17 +375,42 @@ fun TaskEditScreen(
             allTags = allTags,
             selectedTags = currentTags,
             onToggle = viewModel::toggleTag,
-            onCreateTag = { showTagPicker = false; showCreateTag = true },
+            onCreateTag = {
+                showTagPicker = false
+                editingTag = null
+                showCreateTag = true
+            },
+            onEditTag = { tag ->
+                showTagPicker = false
+                editingTag = tag
+                showCreateTag = true
+            },
             onDismiss = { showTagPicker = false }
         )
     }
 
     if (showCreateTag) {
+        val tagBeingEdited = editingTag
         CreateTagDialog(
-            onDismiss = { showCreateTag = false },
-            onConfirm = { name, color, emoji ->
-                viewModel.createAndToggleTag(name, color, emoji)
+            initialTag = tagBeingEdited,
+            onDismiss = {
                 showCreateTag = false
+                editingTag = null
+            },
+            onConfirm = { name, color, emoji ->
+                if (tagBeingEdited != null) {
+                    viewModel.updateTag(
+                        tagBeingEdited.copy(
+                            name = name.trim(),
+                            colorHex = color.hex,
+                            emoji = emoji
+                        )
+                    )
+                } else {
+                    viewModel.createAndToggleTag(name, color, emoji)
+                }
+                showCreateTag = false
+                editingTag = null
             }
         )
     }

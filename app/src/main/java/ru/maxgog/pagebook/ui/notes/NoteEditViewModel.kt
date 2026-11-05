@@ -41,6 +41,7 @@ class NoteEditViewModel @Inject constructor(
     private val getTagsForNote: GetTagsForNoteUseCase,
     private val toggleTagOnNote: ToggleTagOnNoteUseCase,
     private val createTag: CreateTagUseCase,
+    private val updateTagUseCase: UpdateTagUseCase,
     private val tagRepository: TagRepository,
     private val createTaskFromNote: CreateTaskFromNoteUseCase,
     private val saveTask: SaveTaskUseCase,
@@ -120,6 +121,30 @@ class NoteEditViewModel @Inject constructor(
             val tagId = createTag(name, color, emoji)
             val tag = Tag(id = tagId.toInt(), name = name.trim(), colorHex = color.hex, emoji = emoji)
             toggleTag(tag)
+        }
+    }
+
+    fun updateTag(tag: Tag) {
+        viewModelScope.launch {
+            try {
+                val newColor = TagColor.entries.firstOrNull { it.hex == tag.colorHex } ?: TagColor.BLUE
+                updateTagUseCase(
+                    tag = tag,
+                    newName = tag.name,
+                    newEmoji = tag.emoji,
+                    newColor = newColor
+                )
+                val current = _uiState.value
+                if (current is NoteEditUiState.NewNote) {
+                    val updated = current.selectedTags.map {
+                        if (it.id == tag.id) tag else it
+                    }
+                    _uiState.value = current.copy(selectedTags = updated)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "updateTag failed", e)
+                notificationManager.error(R.string.unknown_error)
+            }
         }
     }
 

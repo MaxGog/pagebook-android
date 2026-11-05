@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -75,24 +76,36 @@ fun TagChip(
 
 @Composable
 private fun EditTrailingIcon(contentColor: Color, onClick: () -> Unit) {
-    Icon(
-        Icons.Default.Edit,
-        contentDescription = stringResource(R.string.edit_tag),
+    Box(
         modifier = Modifier
-            .size(FilterChipDefaults.IconSize)
-            .clickable { onClick() },
-        tint = contentColor
-    )
+            .size(28.dp)
+            .clip(CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            Icons.Default.Edit,
+            contentDescription = stringResource(R.string.edit_tag),
+            modifier = Modifier.size(FilterChipDefaults.IconSize),
+            tint = contentColor
+        )
+    }
 }
 
 @Composable
 private fun DeleteTrailingIcon(contentColor: Color, onClick: () -> Unit) {
-    Icon(
-        Icons.Default.Close,
-        contentDescription = stringResource(R.string.delete_tag),
+    Box(
         modifier = Modifier
-            .size(FilterChipDefaults.IconSize)
-            .clickable { onClick() },
-        tint = contentColor
-    )
+            .size(28.dp)
+            .clip(CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            Icons.Default.Close,
+            contentDescription = stringResource(R.string.delete_tag),
+            modifier = Modifier.size(FilterChipDefaults.IconSize),
+            tint = contentColor
+        )
+    }
 }
