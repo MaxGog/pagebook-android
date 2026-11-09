@@ -17,6 +17,185 @@
   (`Loading`/`NewNote`/`Editing`/`Error`).
 - **Адаптивная сетка заметок**: `StaggeredGridCells.Adaptive(minSize = 160.dp)`.
 
+**Notes — мультиверсионные заметки для соцсетей**
+- **Domain-модели**:
+  - **`NotePlatform`** — enum `MAIN`, `TELEGRAM`, `VK`, `INSTAGRAM`,
+    `TWITTER`, `MASTODON`. `MAIN` — «оригинал», хранится в самой `Note`
+    (без записи в `note_variants`), остальные — версии.
+  - **`NoteVariant`** — data-класс: `id`, `noteId`, `platform`, `title`,
+    `content` (HTML), `createdAt`.
+- **Data Layer**:
+  - **`NoteVariantModel`** (`@Entity tableName = "note_variants"`) —
+    `ForeignKey(NoteModel)` с `onDelete = CASCADE`,
+    `Index("noteId")`, **unique** `Index(["noteId", "platform"])` —
+    «одна версия на платформу» гарантируется БД.
+  - **`NoteVariantDao`** — `getForNote(noteId): Flow<List<NoteVariantModel>>`,
+    `getByPlatform(noteId, platform)`, `insert` (`REPLACE`), `update`, `delete`.
+  - **`NoteVariantMapper`** (`Entity ↔ Domain`, `platform` как `String`/enum).
+  - **`NoteVariantRepository`** (Domain, interface) +
+    **`NoteVariantRepositoryImpl`** (`@Singleton`, Data).
+  - **`@Binds NoteVariantRepository`** в `RepositoryModule`;
+    **`@Provides NoteVariantDao`** в `DatabaseModule`.
+- **Use Cases** (`domain/usecase/note/`):
+  - `GetVariantsForNoteUseCase` — `Flow<List<NoteVariant>>`;
+  - `SaveNoteVariantUseCase` — insert/update, возвращает `Long`;
+  - `DeleteNoteVariantUseCase` — удаляет запись варианта.
+- **UI — `NoteEditScreen` / `NoteEditViewModel`**:
+  - **`PlatformSelectorRow`** (FlowRow под `TopAppBar`) — `FilterChip` по
+    каждой версии (`MAIN` + список `variants`) + `AssistChip`
+    «Add version» с `DropdownMenu` из неиспользованных платформ.
+  - На чипе версии — иконка ✕ (`Icons.Default.Close`) для удаления;
+    у `MAIN` иконки нет — оригинал не удаляется.
+  - **`switchPlatform(platform, title, content)`** — **автосохраняет**
+    текущую платформу перед переключением (MAIN → `SaveNoteUseCase`,
+    версия → `SaveNoteVariantUseCase`); если версии ещё нет, создаёт
+    пустую, чтобы получить `variant.id` для вложений.
+  - **`deleteVariant(platform)`** — удаляет вложения варианта
+    (`OwnerType.NOTE_VARIANT`) + запись `NoteVariant`; если активная
+    платформа была удалена — переключаемся на `MAIN`.
+  - **`NoteEditUiState.Editing`** расширен: `variants: List<NoteVariant>`,
+    `activePlatform: NotePlatform = MAIN`, `attachments` — вложения
+    **активной** платформы.
+  - `titleState` / `richTextState` реактивно синхронизируются с
+    `activePlatform` (`LaunchedEffect(activePlatform, editing.note.id)`).
+  - **Вложения вариантов** — через `OwnerType.NOTE_VARIANT` + `variant.id`;
+    реактивное переключение через `flatMapLatest` по
+    `activePlatform to variants`.
+  - **`attachUri()`** выбирает владельца по `activePlatform`:
+    `NOTE + note.id` для `MAIN`, `NOTE_VARIANT + variant.id` для версии.
+  - **`delete()`** каскадно удаляет вложения всех вариантов и самой
+    заметки (у `AttachmentEntity` нет FK — вручную).
+  - Для **новой заметки** селектор скрыт с подсказкой
+    «Сохраните заметку, чтобы добавить версии» (версии требуют `noteId`).
+- **`OwnerType.NOTE_VARIANT`** — новый элемент enum. Существующая
+  инфраструктура вложений (`AttachmentFileStore`, `MediaStoreDownloader`,
+  `AttachmentPreviewList`, `FullScreenAttachmentViewer`) работает
+  без изменений.
+- **Строки** (`strings.xml` ru/en): `platform_main`, `platform_telegram`,
+  `platform_vk`, `platform_instagram`, `platform_twitter`, `platform_mastodon`,
+  `add_platform_version`, `save_note_first`, `version_deleted`.
+
+**Tasks — Clean Architecture и переименование Todo → Task**
+- **Переименование модуля**: `TodoModel` → `TaskModel`, `TodoDao` → `TaskDao`,
+  `TodoRepository` → `TaskRepository`, `TodoModule` → `TaskModule`,
+  `TodoScreen` → `TaskListScreen`, `TodoItem` → `TaskItem`,
+  `TodoViewModel` → `TaskListViewModel`, `TodoDestination` → `TaskListDestination`.
+- **Domain Layer**: `Task`, `TaskRepository` (интерфейс), Use Cases
+  (`GetAllTasksUseCase`, `GetTaskByIdUseCase`, `SaveTaskUseCase`,
+  `DeleteTaskUseCase`, `CreateTaskFromNoteUseCase`).
+- **Mapper** `Task ↔ TaskModel` (`data/mapper/TaskMapper.kt`).
+- **UI State**: `TaskListUiState`, `TaskEditUiState`
+  (`Loading`/`NewTask`/`Editing`/`Error`).
+- **Экран редактирования** `TaskEditScreen` + `TaskEditViewModel`
+  с навигацией через `TaskEditDestination(taskId: Int?)`.
+- **Связь Task ↔ Note** через колонку `NoteId` с `Index("NoteId")`
+  в `TaskModel`.
+- **Авто-извлечение дат** из текста заметки через
+  **ML Kit Entity Extraction** (`TYPE_DATE_TIME`) — `CreateTaskFromNoteUseCase`.
+- **Сортировка задач**: незавершённые сверху (`IsCompleted ASC`),
+  внутри группы — новые первыми (`AtCreated DESC`).
+
+**Calendar — Clean Architecture**
+- **Domain Layer для событий**: `Event`, `EventRepository` (интерфейс),
+  Use Cases (`GetAllEventsUseCase`, `SaveEventUseCase`, `DeleteEventUseCase`).
+- **Mapper** `Event ↔ EventModel` (`data/mapper/EventMapper.kt`).
+- **UI State**: `CalendarUiState` (data class) — собирается через `combine`
+  из списка событий, выбранной даты и флага диалога.
+- **`CalendarScreen`** переехал в `ui/calendar/` и полностью переписан:
+  больше нет закомментированного кода и устаревшего `SetTransparentSystemBars`.
+- **Реактивность**: `EventDao.getAllEvents()` теперь возвращает
+  `Flow<List<EventModel>>` вместо `suspend List`.
+- **`@Update`** в `EventDao` — редактирование событий.
+- **Автоскролл** к месяцу выбранной даты через
+  `LaunchedEffect(uiState.selectedDate)`.
+
+**Tags — сквозная система цветных тегов**
+- **Domain-модели**: `Tag` (`id`, `name`, `colorHex`, `emoji`) и `TagColor` (enum из 7
+  цветов macOS: `RED`, `ORANGE`, `YELLOW`, `GREEN`, `BLUE`, `PURPLE`, `GRAY`).
+- **`TagRepository`** (интерфейс) + `TagRepositoryImpl` (реализация) + `TagMapper`.
+- **`TagModel`** (`@Entity tableName = "tags"`, колонка `Emoji`).
+- **Junction-таблицы** для many-to-many:
+  `NoteTagCrossRef`, `TaskTagCrossRef`, `EventTagCrossRef`
+  (составной PK, `onDelete = CASCADE` на обе стороны).
+- **`TagDao`**: CRUD для тегов, `hasTagOn{Note,Task,Event}`, SQL-запросы
+  через `INNER JOIN`, `@Transaction`-обёртки `getNoteWithTags`/`getTaskWithTags`/
+  `getEventWithTags`.
+- **`NoteWithTags`, `TaskWithTags`, `EventWithTags`** — `@Relation` + `@Junction`
+  для загрузки сущности вместе с тегами одним запросом (без N+1).
+- **Use Cases** в `domain/usecase/tag/`:
+  - `GetAllTagsUseCase`, `CreateTagUseCase` (`name, color, emoji`),
+    `UpdateTagUseCase` (`name, color, emoji`), `DeleteTagUseCase`.
+  - `GetTagsForNoteUseCase`, `GetTagsForTaskUseCase`, `GetTagsForEventUseCase`.
+  - `ToggleTagOnNoteUseCase`, `ToggleTagOnTaskUseCase`, `ToggleTagOnEventUseCase`
+    (возвращают `Boolean` — был ли тег добавлен).
+- **UI-компоненты** в `ui/components/`:
+  - `TagChip` — `FilterChip` с эмодзи (или цветным кружком) и опциональной кнопкой ×.
+  - `CompactTagChip` — компактная плашка `"🎯 Цели"`.
+  - `CreateTagDialog` — диалог с превью, полем имени, кнопкой «Добавить эмодзи», палитрой 7 цветов.
+  - `TagPickerDialog` — выбор тегов для сущности с кнопкой «Создать тег».
+  - **`EmojiCatalog`** — 200+ эмодзи в 10 категориях (`@StringRes` для названий).
+  - **`EmojiPickerDialog`** — `FilterChip`-категории + `LazyVerticalGrid` эмодзи.
+- **Интеграция в Notes/Tasks/Calendar**: кнопка 🏷️, чипы под заголовком/описанием,
+  `TagPickerDialog` + `CreateTagDialog`, до 3 `CompactTagChip` на карточках.
+- **`_pendingTags` / `selectedTags`** — накопление тегов для новой
+  (ещё не сохранённой) сущности; привязка после `save*`, когда Room
+  сгенерировал `id`.
+
+**Tags — фильтрация списков по тегам (Notes / Tasks / Calendar)**
+- **Новый компонент `TagFilterRow`** (`ui/components/`) — горизонтальный
+  `LazyRow` из `FilterChip` (переиспользует `TagChip` с `selected = true`).
+  В конце ряда — `AssistChip` **«Сбросить»** (`clear_filters`), появляется
+  только при активном фильтре. Не рендерится, если `allTags` пуст.
+- **`_selectedTagIds: MutableStateFlow<Set<Int>>`** в `NotesViewModel`,
+  `TaskListViewModel`, `CalendarViewModel` + `allTags: StateFlow<List<Tag>>`
+  из `GetAllTagsUseCase`. Публичные методы `toggleTagFilter(tagId)` и
+  `clearTagFilter()`.
+- **OR-логика фильтрации** — сущность проходит, если у неё есть **хотя бы
+  один** из выбранных тегов; пустой `Set` = без фильтра. Реализовано через
+  `combine(getAll*(), _selectedTagIds)` — **без новых DAO-запросов**,
+  фильтрация в памяти по уже загруженным `@Relation tags`.
+- **`CalendarUiState.datesWithEvents: Set<LocalDate>`** — вычисляется
+  из **отфильтрованного** списка событий. Точки-индикаторы на днях
+  календаря автоматически сужаются под фильтр. **Заодно исправлен баг**:
+  раньше точка рисовалась только на выбранном дне, а не на всех днях
+  с событиями.
+- **EmptyState при активном фильтре** — новая строка
+  `R.string.no_matching_items` («Ничего не найдено» / «Nothing found»)
+  вместо «Нет заметок / задач / событий», чтобы пользователь понимал,
+  что дело в фильтре, а не в отсутствии данных.
+- **Новые строки** (`strings.xml` ru/en): `no_matching_items`,
+  `clear_filters`.
+- **Затронутые экраны**: `NotesScreen`, `TaskListScreen`, `CalendarScreen`
+  — над списком добавлен `Column` с `TagFilterRow`.
+
+**Tags — persist-фильтр, OR/AND, badge, редактирование и счётчик использования**
+- **`TagFilterState`** (`domain/model/`):
+  `data class TagFilterState(tagIds: Set<Int>, mode: FilterMode)` с
+  `isEmpty`/`count`. **`FilterMode`** — enum `OR`/`AND`.
+  **`TagFilterModule`** — enum `NOTES`/`TASKS`/`CALENDAR`.
+- **`TagFilterRepository`** (интерфейс) + **`TagFilterRepositoryImpl`**
+  (`@Singleton`, `DataStore<Preferences>`):
+  - `getFilter(module): Flow<TagFilterState>`;
+  - `setFilter(module, state)`;
+  - `clearFilter(module)`.
+  - Ключи `tag_filter_<module>_ids` и `tag_filter_<module>_mode`.
+  - **Persist-фильтр переживает перезапуск приложения**, отдельно для
+    каждого модуля.
+- **`applyTagFilter`** — общая утилита в **`domain/util/TagFilterExt.kt`**:
+  ```kotlin
+  fun <T> List<T>.applyTagFilter(
+      filter: TagFilterState,
+      tagsOf: (T) -> List<Tag>
+  ): List<T>
+
+**Notes — Domain Layer**
+- **Domain Layer для заметок**: `Note`, `NoteRepository` (интерфейс), Use Cases
+  (`GetAllNotesUseCase`, `GetNoteByIdUseCase`, `SaveNoteUseCase`, `DeleteNoteUseCase`).
+- **Mapper** `Note ↔ NoteModel` (`data/mapper/NoteMapper.kt`).
+- **UI State** для экранов заметок: `NotesUiState`, `NoteEditUiState`
+  (`Loading`/`NewNote`/`Editing`/`Error`).
+- **Адаптивная сетка заметок**: `StaggeredGridCells.Adaptive(minSize = 160.dp)`.
+
 **Tasks — Clean Architecture и переименование Todo → Task**
 - **Переименование модуля**: `TodoModel` → `TaskModel`, `TodoDao` → `TaskDao`,
   `TodoRepository` → `TaskRepository`, `TodoModule` → `TaskModule`,

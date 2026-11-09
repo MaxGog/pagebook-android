@@ -168,4 +168,17 @@
     <string name="close">Закрыть</string>
     <string name="download">Скачать</string>
     <string name="attachment_load_error">Не удалось загрузить изображение</string>
+
+    <string name="platform_main">Основная</string>
+    <string name="platform_telegram">Telegram</string>
+    <string name="platform_vk">VK</string>
+    <string name="platform_instagram">Instagram</string>
+    <string name="platform_twitter">X (Twitter)</string>
+    <string name="platform_mastodon">Mastodon</string>
+    <string name="platform_bluesky">Bluesky</string>
+    <string name="platform_facebook">Facebook</string>
+    <string name="platform_other">Другое</string>
+    <string name="add_platform_version">Добавить версию</string>
+    <string name="save_note_first">Сохраните заметку, чтобы добавить версии</string>
+    <string name="version_deleted">Версия удалена</string>
 </resources>

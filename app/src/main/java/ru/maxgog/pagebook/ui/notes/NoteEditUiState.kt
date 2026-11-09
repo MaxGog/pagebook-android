@@ -2,6 +2,8 @@ package ru.maxgog.pagebook.ui.notes
 
 import ru.maxgog.pagebook.domain.model.Attachment
 import ru.maxgog.pagebook.domain.model.Note
+import ru.maxgog.pagebook.domain.model.NotePlatform
+import ru.maxgog.pagebook.domain.model.NoteVariant
 import ru.maxgog.pagebook.domain.model.Tag
 
 sealed interface NoteEditUiState {
@@ -15,7 +17,9 @@ sealed interface NoteEditUiState {
     data class Editing(
         val note: Note,
         val tags: List<Tag> = emptyList(),
-        val attachments: List<Attachment> = emptyList()
+        val attachments: List<Attachment> = emptyList(),
+        val variants: List<NoteVariant> = emptyList(),
+        val activePlatform: NotePlatform = NotePlatform.MAIN
     ) : NoteEditUiState
 
     data class Error(val message: String) : NoteEditUiState

@@ -19,7 +19,7 @@ PageBook Android следует официальным рекомендация�
 
 > **Статус миграции:** Clean Architecture полностью внедрена для всех трёх
 > модулей — **Notes**, **Tasks** и **Events (Calendar)**. Все три БД объединены
-> в одну `PageBookDatabase` (version 4). Сквозная система **тегов с кастомизацией
+> в одну `PageBookDatabase` (version **5**). Сквозная система **тегов с кастомизацией
 > цвета и эмодзи** доведена до полноценного UX: **фильтрация списков** (OR/AND,
 > persist через DataStore, badge с count), **редактирование тегов** и **счётчик
 > использования**. Эмодзи-пикер получил **поиск** (по ключевым словам,
@@ -28,29 +28,32 @@ PageBook Android следует официальным рекомендация�
 > MediaStore, **системная камера** через `FileProvider`), **fullscreen-просмотр
 > вложений** с pinch-to-zoom (`FullScreenAttachmentViewer`), **глобальная система
 > уведомлений** (кастомный `Snackbar` с аватаром-фурсоной) и **пасхалка** в
-> настройках. UI переведён на Material 3 Expressive, локализован на `ru`/`en`,
-> добавлена адаптивность под планшеты.
+> настройках. **Мультиверсионные заметки для соцсетей** позволяют вести одну
+> заметку с несколькими адаптациями под разные платформы (Telegram, VK,
+> Instagram, X, Mastodon) — каждая версия хранится в `NoteVariant` и имеет
+> собственные вложения. UI переведён на Material 3 Expressive, локализован на
+> `ru`/`en`, добавлена адаптивность под планшеты.
 
 ## 🛠 Технологический стек
 
-| Компонент           | Технология                                                    | Версия         |
-|:--------------------|:--------------------------------------------------------------|:---------------|
-| Язык                | Kotlin                                                        | 2.2.20         |
-| UI                  | Jetpack Compose + **Material 3 Expressive**                   | BOM 2026.09.00 |
-| Архитектура         | Clean Architecture (UI/Domain/Data)                           | —              |
-| Локальное хранилище | Room (одна БД `pagebook.db`)                                  | 2.7.2          |
-| Rich text           | RichEditor (Compose Multiplatform)                            | —              |
-| Файловое хранилище  | App-private (`filesDir/attachments/`) + `cacheDir` (камера) + MediaStore (download) | —       |
-| Камера              | `ActivityResultContracts.TakePicture()` + `FileProvider`       | —              |
-| Настройки           | DataStore Preferences (**тема + фильтры тегов + недавние эмодзи**) | 1.2.1      |
-| Язык приложения     | `AppCompatDelegate.setApplicationLocales()`                   | appcompat 1.7  |
-| Асинхронность       | Coroutines & Flow + `Channel` для one-shot событий            | 1.10.2         |
-| DI                  | **Hilt** (`@Binds` + `@Provides`)                             | 2.56.2         |
-| Навигация           | Navigation Compose (type-safe) + `material3-adaptive-*`       | 2.9.0          |
-| ML                  | **ML Kit Entity Extraction** (beta)                           | 16.0.0-beta6   |
-| Сборка              | AGP                                                           | 9.4.1          |
-| SDK                 | compileSdk 37 / targetSdk 36 / minSdk 28                      | —              |
-| JDK                 | Java 21                                                       | —              |
+| Компонент           | Технология                                                                          | Версия         |
+|:--------------------|:------------------------------------------------------------------------------------|:---------------|
+| Язык                | Kotlin                                                                              | 2.2.20         |
+| UI                  | Jetpack Compose + **Material 3 Expressive**                                         | BOM 2026.09.00 |
+| Архитектура         | Clean Architecture (UI/Domain/Data)                                                 | —              |
+| Локальное хранилище | Room (одна БД `pagebook.db`)                                                        | 2.7.2          |
+| Rich text           | RichEditor (Compose Multiplatform)                                                  | —              |
+| Файловое хранилище  | App-private (`filesDir/attachments/`) + `cacheDir` (камера) + MediaStore (download) | —              |
+| Камера              | `ActivityResultContracts.TakePicture()` + `FileProvider`                            | —              |
+| Настройки           | DataStore Preferences (**тема + фильтры тегов + недавние эмодзи**)                  | 1.2.1          |
+| Язык приложения     | `AppCompatDelegate.setApplicationLocales()`                                         | appcompat 1.7  |
+| Асинхронность       | Coroutines & Flow + `Channel` для one-shot событий                                  | 1.10.2         |
+| DI                  | **Hilt** (`@Binds` + `@Provides`)                                                   | 2.56.2         |
+| Навигация           | Navigation Compose (type-safe) + `material3-adaptive-*`                             | 2.9.0          |
+| ML                  | **ML Kit Entity Extraction** (beta)                                                 | 16.0.0-beta6   |
+| Сборка              | AGP                                                                                 | 9.4.1          |
+| SDK                 | compileSdk 37 / targetSdk 36 / minSdk 28                                            | —              |
+| JDK                 | Java 21                                                                             | —              |
 
 ## 📂 Структура пакетов
 
@@ -65,28 +68,35 @@ ru.maxgog.pagebook
 │                                 #   AppNotificationType (SUCCESS/ERROR/INFO/EASTER_EGG)
 │
 ├── data/
-│   ├── dao/                      # NoteDao, TaskDao, EventDao, TagDao (+ TagUsageRow)
+│   ├── dao/                      # NoteDao, TaskDao, EventDao, TagDao (+ TagUsageRow),
+│   │                             #   NoteVariantDao
 │   ├── local/                    # AttachmentDao, AttachmentEntity
 │   ├── models/                   # Entity-классы + @Relation-обёртки
-│   ├── rooms/                    # PageBookDatabase, Migrations
+│   │                             #   (NoteModel, NoteVariantModel, ...)
+│   ├── rooms/                    # PageBookDatabase, Migrations (2→3, 3→4, 4→5)
 │   ├── file/                     # AttachmentFileStore, MediaStoreDownloader
 │   ├── mapper/                   # NoteMapper, TaskMapper, EventMapper, TagMapper,
-│   │                             #   AttachmentMapper
+│   │                             #   AttachmentMapper, NoteVariantMapper
 │   ├── repository/               # *RepositoryImpl, SettingsRepository,
 │   │                             #   TagFilterRepositoryImpl (DataStore),
-│   │                             #   RecentEmojiRepositoryImpl (DataStore)
+│   │                             #   RecentEmojiRepositoryImpl (DataStore),
+│   │                             #   NoteVariantRepositoryImpl
 │   └── di/                       # DatabaseModule, RepositoryModule,
 │                                 #   DataStoreModule, AttachmentsModule
 │
 ├── domain/
 │   ├── model/                    # Note, Task, Event, Tag, TagColor,
 │   │                             #   Attachment, AttachmentType, OwnerType,
+│   │                             #   NoteVariant, NotePlatform,
 │   │                             #   TagFilterState, FilterMode, TagFilterModule,
 │   │                             #   TagUsage
 │   ├── repository/               # NoteRepository, TaskRepository, EventRepository,
 │   │                             #   TagRepository, TagFilterRepository,
-│   │                             #   RecentEmojiRepository, AttachmentRepository
+│   │                             #   RecentEmojiRepository, AttachmentRepository,
+│   │                             #   NoteVariantRepository
 │   ├── usecase/                  # note/, task/, event/, tag/, attachment/
+│   │                             #   (note/ включает GetVariantsForNoteUseCase,
+│   │                             #    SaveNoteVariantUseCase, DeleteNoteVariantUseCase)
 │   └── util/                     # TagFilterExt.kt (applyTagFilter)
 │
 └── ui/
@@ -106,7 +116,8 @@ ru.maxgog.pagebook
     │                             #   CameraPicker (TakePicture + FileProvider),
     │                             #   FullScreenAttachmentViewer (pinch/double-tap zoom),
     │                             #   ResizeImageDialog
-    ├── notes/                    # NotesScreen, NoteEditScreen + ViewModels + UiStates + NoteItem
+    ├── notes/                    # NotesScreen, NoteEditScreen (+PlatformSelectorRow,
+    │                             #   NotePlatform.labelRes) + ViewModels + UiStates + NoteItem
     ├── tasks/                    # TaskListScreen, TaskEditScreen, TaskItem,
     │                             #   TaskListDetailPane + ViewModels + UiStates
     ├── calendar/                 # CalendarScreen, AddEventDialog, DateTimePickerDialog,
@@ -119,18 +130,18 @@ ru.maxgog.pagebook
 
 ## 💾 Единая база данных `PageBookDatabase`
 
-Проект использует **одну `RoomDatabase`** с **восемью сущностями** — это
-необходимое условие для сквозной системы тегов через `ForeignKey` и
-хранения вложений с общим `ownerType`/`ownerId` для заметок и задач.
+Проект использует **одну `RoomDatabase`** с **девятью сущностями** — это
+необходимое условие для сквозной системы тегов через `ForeignKey`,
+хранения вложений с общим `ownerType`/`ownerId` и мультиверсионных заметок.
 
 ```kotlin
 @Database(
     entities = [
         NoteModel::class, TaskModel::class, EventModel::class, TagModel::class,
         NoteTagCrossRef::class, TaskTagCrossRef::class, EventTagCrossRef::class,
-        AttachmentEntity::class
+        AttachmentEntity::class, NoteVariantModel::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class PageBookDatabase : RoomDatabase() {
@@ -139,6 +150,7 @@ abstract class PageBookDatabase : RoomDatabase() {
     abstract fun eventDao(): EventDao
     abstract fun tagDao(): TagDao
     abstract fun attachmentDao(): AttachmentDao
+    abstract fun noteVariantDao(): NoteVariantDao
 }
 ```
 
@@ -150,7 +162,172 @@ abstract class PageBookDatabase : RoomDatabase() {
 | **Note ↔ Tag**               | Junction `NoteTagCrossRef` с `onDelete = CASCADE`                                                 |
 | **Task ↔ Tag**               | Junction `TaskTagCrossRef` с `onDelete = CASCADE`                                                 |
 | **Event ↔ Tag**              | Junction `EventTagCrossRef` с `onDelete = CASCADE`                                                |
-| **Attachment → Note / Task** | Полиморфная связь через `ownerType: OwnerType` + `ownerId: Int` + `Index("ownerType", "ownerId")` |
+| **Attachment → Note / Task / NoteVariant** | Полиморфная связь через `ownerType: OwnerType` + `ownerId: Int` + `Index("ownerType", "ownerId")` (`OwnerType.NOTE_VARIANT` — для вложений версий) |
+| **Note → NoteVariant**       | `NoteVariantModel.noteId` с `ForeignKey(NoteModel, onDelete = CASCADE)` + `Index("noteId")` + **уникальный** `Index("noteId", "platform")` — у заметки не может быть двух версий одной платформы |
+
+## 📝 Мультиверсионные заметки для соцсетей
+
+Пользователь (например, художник или контент-мейкер) пишет пост один раз
+и заводит **несколько версий** одной и той же заметки, адаптированных
+под разные соцсети. Оригинал хранится в самой `Note`, каждая версия — в
+`NoteVariant`.
+
+### 🧩 Domain-модели
+
+```kotlin
+// domain/model/NotePlatform.kt
+enum class NotePlatform { MAIN, TELEGRAM, VK, INSTAGRAM, TWITTER, MASTODON }
+
+// domain/model/NoteVariant.kt
+data class NoteVariant(
+    val id: Int = 0,
+    val noteId: Int,
+    val platform: NotePlatform,
+    val title: String = "",
+    val content: String = "",       // HTML, как и Note.content
+    val createdAt: Long = System.currentTimeMillis()
+)
+```
+
+- **`NotePlatform.MAIN`** — «оригинал». Хранится **не** в `NoteVariant`, а в
+  самой `Note`. Это позволяет не плодить запись для базовой версии и
+  упрощает списки/поиск.
+- **`NoteVariant`** — data-класс с `id` (autoincrement PK), `noteId` (FK
+  на `notes.NoteId` с `CASCADE`), `platform` (String в БД, enum в Domain),
+  `title`/`content` (HTML) и `createdAt`. Уникальность пары `(noteId, platform)`
+  гарантируется **unique index** на уровне БД.
+
+### 🗄 Data Layer
+
+- **`NoteVariantModel`** — entity в `data/models/` с `ForeignKey(NoteModel)`
+    + `Index("noteId")` + `Index(["noteId", "platform"], unique = true)`.
+- **`NoteVariantDao`** — `getForNote(noteId): Flow<List<NoteVariantModel>>`,
+  `getByPlatform(noteId, platform)`, `insert` (`REPLACE`), `update`, `delete`.
+- **`NoteVariantRepository`** (Domain) + **`NoteVariantRepositoryImpl`** (Data, `@Singleton`).
+- **`NoteVariantMapper`** — `NoteVariant ↔ NoteVariantModel` (`platform.name`
+  в обе стороны).
+- **`MIGRATION_4_5`** — создаёт таблицу `note_variants` с индексами.
+  В `DatabaseModule` **подключена** через `.addMigrations(2_3, 3_4, 4_5)`;
+  `fallbackToDestructiveMigration()` **убран** — данные пользователей
+  сохраняются.
+- **Hilt:** `@Binds NoteVariantRepository ← NoteVariantRepositoryImpl` в
+  `RepositoryModule`; `@Provides NoteVariantDao` в `DatabaseModule`.
+
+### 🧠 Use Cases
+
+В `domain/usecase/note/`:
+
+| Use Case                        | Назначение                                            |
+|:--------------------------------|:------------------------------------------------------|
+| `GetVariantsForNoteUseCase`     | `Flow<List<NoteVariant>>` для редактора и списка      |
+| `SaveNoteVariantUseCase`        | insert (id = 0) или update; возвращает `id`           |
+| `DeleteNoteVariantUseCase`      | удаление (каскадно снесёт и вложения в БД)            |
+
+### 🎨 UI: переключение версий в `NoteEditScreen`
+
+```
+TopAppBar (title: "Edit note · Telegram")
+└── PlatformSelectorRow (FlowRow под TopAppBar)
+    ├── FilterChip "Original"        — MAIN
+    ├── FilterChip "Telegram" (✕)    — variant
+    ├── FilterChip "VK"        (✕)    — variant
+    └── AssistChip "Add version" → DropdownMenu(unused platforms)
+```
+
+**Поведение:**
+
+1. При открытии сохранённой заметки `activePlatform = MAIN`; редактор
+   показывает `note.title` / `note.content`.
+2. Тап по чипу версии → `viewModel.switchPlatform(platform, currentTitle, currentContent)`:
+    - **текущая платформа автосохраняется** (чтобы не терять ввод);
+    - если версии ещё нет — создаётся пустая `NoteVariant(noteId, platform)`;
+    - `_uiState = Editing(activePlatform = platform, ...)`.
+3. Пока `activePlatform != MAIN` — `titleState`/`richTextState` сбрасываются
+   из выбранного варианта через `LaunchedEffect(activePlatform, note.id)`.
+4. Кнопка ✓ сохраняет **только активную платформу** и возвращает назад
+   (через One-Shot `NoteEditEvent.Saved`).
+5. Тап по ✕ на чипе варианта → `deleteVariant(platform)`:
+    - вложения варианта удаляются вручную (`OwnerType.NOTE_VARIANT`);
+    - запись `NoteVariant` удаляется (FK CASCADE подчищает остатки);
+    - если активная платформа была удалена — переключаемся на `MAIN`.
+6. Для **новой заметки** селектор платформ скрыт с подсказкой
+   «Сохраните заметку, чтобы добавить версии» — версии требуют `noteId`.
+
+### 📎 Вложения версий
+
+Инфраструктура вложений **не меняется** — просто добавляется `OwnerType.NOTE_VARIANT`:
+
+```kotlin
+enum class OwnerType { NOTE, TASK, EVENT, NOTE_VARIANT }
+```
+
+- `AttachmentFileStore`, `SaveAttachmentUseCase`, `MediaStoreDownloader`,
+  `AttachmentPreviewList` работают как есть.
+- В `NoteEditViewModel.attachUri()` владелец выбирается по `activePlatform`:
+  `NOTE + note.id` для `MAIN`, `NOTE_VARIANT + variant.id` для версии.
+- **Вложения реактивно переключаются** через `flatMapLatest` по
+  `activePlatform to variants`:
+  ```kotlin
+  _uiState
+      .map { it as? Editing }
+      .filterNotNull()
+      .distinctUntilChangedBy { it.activePlatform to it.variants.map { v -> v.id to v.platform } }
+      .flatMapLatest { state ->
+          when (state.activePlatform) {
+              MAIN -> getAttachmentsForNote(note.id)
+              else -> state.variants.find { it.platform == state.activePlatform }
+                  ?.let { attachmentRepository.getAttachmentsForOwner(NOTE_VARIANT, it.id) }
+                  ?: flowOf(emptyList())
+          }
+      }
+  ```
+- При **удалении заметки** каскадом удаляются её `NoteVariant`, но т.к.
+  у `AttachmentEntity` нет FK — вложения удаляются вручную:
+  для `MAIN` — `getAttachmentsForNote`, для каждой версии — `getAttachmentsForOwner`.
+
+### 🧭 Ключевые решения по фиче
+
+| Решение                                                        | Обоснование |
+|:---------------------------------------------------------------|:------------|
+| **`NoteVariant` — отдельная таблица, а не JSON-поле в `Note`** | Индексы, FK, отдельный `ownerId` для вложений без правок `AttachmentDao`. |
+| **`NotePlatform.MAIN` без записи в `note_variants`**           | Не дублируем оригинал; `Note` остаётся единым источником для списков. |
+| **Unique index `(noteId, platform)`**                          | Гарантия «одна версия на платформу» на уровне БД, а не в коде. |
+| **Автосохранение при `switchPlatform`**                        | Пользователь не теряет ввод при переключении вкладок-платформ. |
+| **`OwnerType.NOTE_VARIANT`**                                   | Переиспользуем всю подсистему вложений (FileStore, MediaStore, PreviewList, viewer) без изменений. |
+| **`flatMapLatest` по `activePlatform`**                        | Единый реактивный поток вложений; UI не знает о двух источниках. |
+| **Подсказка для новой заметки**                                | Версии требуют `noteId` → сначала `SaveNoteUseCase`, потом варианты. |
+| **`MIGRATION_4_5` вместо `fallbackToDestructiveMigration`**    | Пользовательские данные переживают обновление БД. |
+
+### 🔄 Sequence: переключение версий
+
+```mermaid
+sequenceDiagram
+    participant UI as NoteEditScreen
+    participant VM as NoteEditViewModel
+    participant SaveNote as SaveNoteUseCase
+    participant Repo as NoteVariantRepository
+    participant Att as AttachmentRepository
+
+    UI->>VM: switchPlatform(TELEGRAM, title, content)
+    VM->>SaveNote: invoke(note.copy(title, content))
+    SaveNote-->>VM: ok (MAIN автосохранён)
+    VM->>Repo: getVariant(noteId, TELEGRAM)
+    Repo-->>VM: null (версии ещё нет)
+    VM->>Repo: saveVariant(NoteVariant(noteId, TELEGRAM, "", ""))
+    Repo-->>VM: newVariantId
+    VM->>VM: _uiState = Editing(activePlatform = TELEGRAM)
+    VM->>Att: getAttachmentsForOwner(NOTE_VARIANT, newVariantId)
+    Att-->>VM: Flow(emptyList())
+    VM-->>UI: перерисовка (пустой редактор, чип "Telegram" выделен)
+    Note over UI: пользователь пишет пост, прикрепляет фото
+    UI->>VM: attachUri(uri)
+    VM->>Att: saveAttachment(uri, NOTE_VARIANT, newVariantId)
+    Att-->>VM: Attachment(ownerType = NOTE_VARIANT, ownerId = newVariantId)
+    UI->>VM: save(title, content)
+    VM->>Repo: saveVariant(variant.copy(title, content))
+    Repo-->>VM: ok
+    VM-->>UI: onBack() (через Channel NoteEditEvent.Saved)
+```
 
 ## 🏷️ Система тегов
 
@@ -354,10 +531,10 @@ AlertDialog
 
 ## 📎 Подсистема вложений (Attachments)
 
-Вложения поддерживаются и в заметках, и в задачах через **полиморфную
-связь** (`ownerType: OwnerType` + `ownerId: Int`). Это позволяет не
-плодить отдельные таблицы и один и тот же UI-компонент
-(`AttachmentPreviewList`) переиспользовать в обоих редакторах.
+Вложения поддерживаются в заметках, задачах **и версиях заметок** через
+**полиморфную связь** (`ownerType: OwnerType` + `ownerId: Int`). Это позволяет
+не плодить отдельные таблицы и один и тот же UI-компонент
+(`AttachmentPreviewList`) переиспользовать во всех редакторах.
 
 Источники вложения:
 - **Photo Picker** (`ActivityResultContracts.PickVisualMedia`) — `rememberPhotoPicker`;
@@ -493,11 +670,12 @@ class NoteEditViewModel @Inject constructor(
 
 ### Google Keep-style Note Editor
 `NoteEditScreen`:
-- `BasicTextField` без рамки для заголовка.
-- Теги в `FlowRow` (переносятся на новую строку).
-- Превью вложений (`AttachmentPreviewList`) над редактором.
-- `RichTextEditor` на `weight(1f)`.
-- `FormattingToolbar` использует `windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))` — тулбар **всегда над клавиатурой**.
+- `PlatformSelectorRow` (FlowRow чипов) под `TopAppBar` — только для сохранённых заметок;
+- `BasicTextField` без рамки для заголовка;
+- Теги в `FlowRow` (переносятся на новую строку);
+- Превью вложений (`AttachmentPreviewList`) над редактором — **для активной платформы**;
+- `RichTextEditor` на `weight(1f)`;
+- `FormattingToolbar` использует `windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))` — тулбар **всегда над клавиатурой**;
 - Кнопки «Фото», «Камера» и «Файл» в `TopAppBar` — через `rememberPhotoPicker` / `rememberCameraPicker` / `rememberFilePicker`.
 
 ## ⚡ One-Shot Events (Channel)
@@ -707,43 +885,81 @@ sequenceDiagram
     Note over Store: при следующем открытии ❤️ уже первый в "Недавних"
 ```
 
+### Переключение версии заметки (соцсети)
+```mermaid
+sequenceDiagram
+    participant UI as NoteEditScreen
+    participant VM as NoteEditViewModel
+    participant SaveNote as SaveNoteUseCase
+    participant Repo as NoteVariantRepository
+    participant Att as AttachmentRepository
+
+    UI->>VM: switchPlatform(TELEGRAM, title, content)
+    VM->>SaveNote: invoke(note.copy(title, content))
+    SaveNote-->>VM: ok (MAIN автосохранён)
+    VM->>Repo: getVariant(noteId, TELEGRAM)
+    Repo-->>VM: null (версии ещё нет)
+    VM->>Repo: saveVariant(NoteVariant(noteId, TELEGRAM, "", ""))
+    Repo-->>VM: newVariantId
+    VM->>VM: _uiState = Editing(activePlatform = TELEGRAM)
+    VM->>Att: getAttachmentsForOwner(NOTE_VARIANT, newVariantId)
+    Att-->>VM: Flow(emptyList())
+    VM-->>UI: рекомпозиция (пустой редактор, чип "Telegram" выделен)
+    Note over UI: пользователь пишет пост, прикрепляет фото
+    UI->>VM: attachUri(uri)
+    VM->>Att: saveAttachment(uri, NOTE_VARIANT, newVariantId)
+    Att-->>VM: Attachment(ownerType = NOTE_VARIANT, ownerId = newVariantId)
+    UI->>VM: save(title, content)
+    VM->>Repo: saveVariant(variant.copy(title, content))
+    Repo-->>VM: ok
+    VM-->>UI: onBack() (через Channel NoteEditEvent.Saved)
+```
+
 ## 🧭 Ключевые архитектурные решения
 
-| Решение                                                                      | Обоснование                                                                                                   |
-|:-----------------------------------------------------------------------------|:--------------------------------------------------------------------------------------------------------------|
-| **Clean Architecture**                                                       | UI не зависит от схемы БД; Use Cases инкапсулируют бизнес-логику.                                             |
-| **Repository как интерфейс**                                                 | Позволяет подменить источник данных без изменения Domain/UI.                                                  |
-| **UI State (sealed / data class)**                                           | Явные состояния `Loading`/`Success`/`Error` — предсказуемое поведение.                                        |
-| **One-Shot Events (`Channel`)**                                              | Гарантирует однократный вызов `onBack()` после сохранения.                                                    |
-| **Глобальный `SnackbarHost` + `Channel`**                                    | Избавляет ViewModel от `Context`, гарантирует доставку, убирает дублирование `SnackbarHost` на каждом экране. |
-| **Hilt**                                                                     | Масштабируемый DI, генерируемый на этапе компиляции.                                                          |
-| **Type-safe navigation**                                                     | Компилятор проверяет маршруты и аргументы.                                                                    |
-| **`AppCompatDelegate` для языка**                                            | Единый источник правды, работающий на всех версиях Android.                                                   |
-| **Полиморфные вложения (`ownerType` + `ownerId`)**                           | Одна таблица и один UI-компонент для Notes и Tasks.                                                           |
-| **`localPath` — относительный путь**                                         | Отвязка от абсолютного `filesDir` (меняется между установками/бэкапами).                                      |
-| **`@Update` для pending-вложений**                                           | Избегаем `SQLiteConstraintException` при повторном `insert` с тем же `id`.                                    |
+| Решение                                                                      | Обоснование                                                                                                                                 |
+|:-----------------------------------------------------------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------|
+| **Clean Architecture**                                                       | UI не зависит от схемы БД; Use Cases инкапсулируют бизнес-логику.                                                                           |
+| **Repository как интерфейс**                                                 | Позволяет подменить источник данных без изменения Domain/UI.                                                                                |
+| **UI State (sealed / data class)**                                           | Явные состояния `Loading`/`Success`/`Error` — предсказуемое поведение.                                                                      |
+| **One-Shot Events (`Channel`)**                                              | Гарантирует однократный вызов `onBack()` после сохранения.                                                                                  |
+| **Глобальный `SnackbarHost` + `Channel`**                                    | Избавляет ViewModel от `Context`, гарантирует доставку, убирает дублирование `SnackbarHost` на каждом экране.                               |
+| **Hilt**                                                                     | Масштабируемый DI, генерируемый на этапе компиляции.                                                                                        |
+| **Type-safe navigation**                                                     | Компилятор проверяет маршруты и аргументы.                                                                                                  |
+| **`AppCompatDelegate` для языка**                                            | Единый источник правды, работающий на всех версиях Android.                                                                                 |
+| **Полиморфные вложения (`ownerType` + `ownerId`)**                           | Одна таблица и один UI-компонент для Notes, Tasks и NoteVariant.                                                                            |
+| **`localPath` — относительный путь**                                         | Отвязка от абсолютного `filesDir` (меняется между установками/бэкапами).                                                                    |
+| **`@Update` для pending-вложений**                                           | Избегаем `SQLiteConstraintException` при повторном `insert` с тем же `id`.                                                                  |
 | **`FileProvider` + `cacheDir` для камеры**                                   | Снимок не требует `CAMERA`-разрешения; временный файл полностью под контролем приложения; `SaveAttachmentUseCase` сам копирует в `filesDir` |
-| **`TakePicture` + `pendingFile` (File) в state**                             | `TakePicture` не возвращает URI — храним `File`, из него получаем URI в колбэке и умеем `delete()` при отмене. |
-| **`Dialog(usePlatformDefaultWidth = false)` для fullscreen**                 | Не требует отдельного экрана/навигации; переиспользует `downloadAttachment` из ViewModel.                      |
-| **`rememberTransformableState` + `graphicsLayer` для zoom**                  | Один state (scale/offset), без ручного `detectTransformGestures`; double-tap через `detectTapGestures`.        |
-| **`onImageClick` в `AttachmentPreviewList` (опционально)**                   | Внутренние `IconButton` перехватывают свои клики; тап по картинке открывает viewer, тап по иконке — действие.  |
-| **`TagFilterRepository` на DataStore**                                       | Фильтр переживает перезапуск; каждый модуль (`NOTES`/`TASKS`/`CALENDAR`) помнит свой `tagIds + mode`.         |
-| **`TagFilterState(tagIds, mode)` в Domain**                                  | Тип-безопасное представление фильтра; легко расширять (например, `FilterMode.NOT`), не ломая ViewModel.       |
-| **`applyTagFilter` — общая утилита в `domain/util`**                         | Устраняет дублирование OR/AND между тремя ViewModel; тестируется один раз.                                    |
-| **Long-press на `TagChip` + `AssistChip` OR/AND**                            | Два пути переключения режима: быстрый (long-press) и явный (чип) для новичков.                                |
-| **`FilterBadgeIcon` в `TopAppBar`**                                          | Показывает `count`, а не весь ряд фильтров, — экономит вертикальное место, когда фильтр не активен.           |
-| **`datesWithEvents` из отфильтрованного списка**                             | Точки-индикаторы в календаре автоматически сужаются под фильтр, без дублирования логики.                      |
-| **`TagEditViewModel` отдельно от экрана**                                    | Диалог редактирования тега можно открыть из любого места (Notes/Tasks/Calendar) с идентичным UX.              |
-| **`TagUsage` из 3 `COUNT(*)` в `TagDao`**                                    | Один SQL-запрос вместо трёх последовательных; junction-таблицы уже проиндексированы по `tagId`.               |
-| **`EmojiCatalog.search(query, categoryNames)` — чистая функция**             | Тестируется без Compose/Context; `object` остаётся свободным от Android-зависимостей.                          |
-| **Поиск по 4 каналам (символ / keywords ru+en / Unicode-имя / категория)**   | Максимальный охват без ручного описания каждого эмодзи; Unicode-имя — fallback для «забытых» ключевых слов.    |
-| **`RecentEmojiRepository` на DataStore**                                     | 20 последних эмодзи переживают перезапуск; `@Singleton` + `Flow` дают реактивное обновление UI без ручного refresh. |
-| **`EmojiPickerViewModel` отдельно от `EmojiPickerDialog`**                   | Диалог остаётся переиспользуемым; логика недавних изолирована и не течёт в `CreateTagDialog`.                  |
-| **Секция «Недавние» рендерится только при непустом списке**                  | Не засоряет UI у нового пользователя; не требует дополнительных условий в родительских экранах.                |
-| **Адаптивные лейауты (`NavigationSuiteScaffold`, `ListDetailPaneScaffold`)** | Соответствие гайдлайнам Google для телефонов, планшетов и Chromebook.                                         |
-| **M3 Expressive (`Card`, `ListItem`)**                                       | Современный вид без alpha-зависимостей.                                                                       |
-| **`@StringRes` в ViewModel**                                                 | Snackbar-сообщения локализуются без утечек `Context`.                                                         |
-| **Кастомный `Snackbar` с фурсоной**                                          | Единый стиль уведомлений, брендинг, M3 Expressive (`Surface` + `Box` для выхода за рамки).                    |
+| **`TakePicture` + `pendingFile` (File) в state**                             | `TakePicture` не возвращает URI — храним `File`, из него получаем URI в колбэке и умеем `delete()` при отмене.                              |
+| **`Dialog(usePlatformDefaultWidth = false)` для fullscreen**                 | Не требует отдельного экрана/навигации; переиспользует `downloadAttachment` из ViewModel.                                                   |
+| **`rememberTransformableState` + `graphicsLayer` для zoom**                  | Один state (scale/offset), без ручного `detectTransformGestures`; double-tap через `detectTapGestures`.                                     |
+| **`onImageClick` в `AttachmentPreviewList` (опционально)**                   | Внутренние `IconButton` перехватывают свои клики; тап по картинке открывает viewer, тап по иконке — действие.                               |
+| **`TagFilterRepository` на DataStore**                                       | Фильтр переживает перезапуск; каждый модуль (`NOTES`/`TASKS`/`CALENDAR`) помнит свой `tagIds + mode`.                                       |
+| **`TagFilterState(tagIds, mode)` в Domain**                                  | Тип-безопасное представление фильтра; легко расширять (например, `FilterMode.NOT`), не ломая ViewModel.                                     |
+| **`applyTagFilter` — общая утилита в `domain/util`**                         | Устраняет дублирование OR/AND между тремя ViewModel; тестируется один раз.                                                                  |
+| **Long-press на `TagChip` + `AssistChip` OR/AND**                            | Два пути переключения режима: быстрый (long-press) и явный (чип) для новичков.                                                              |
+| **`FilterBadgeIcon` в `TopAppBar`**                                          | Показывает `count`, а не весь ряд фильтров, — экономит вертикальное место, когда фильтр не активен.                                         |
+| **`datesWithEvents` из отфильтрованного списка**                             | Точки-индикаторы в календаре автоматически сужаются под фильтр, без дублирования логики.                                                    |
+| **`TagEditViewModel` отдельно от экрана**                                    | Диалог редактирования тега можно открыть из любого места (Notes/Tasks/Calendar) с идентичным UX.                                            |
+| **`TagUsage` из 3 `COUNT(*)` в `TagDao`**                                    | Один SQL-запрос вместо трёх последовательных; junction-таблицы уже проиндексированы по `tagId`.                                             |
+| **`EmojiCatalog.search(query, categoryNames)` — чистая функция**             | Тестируется без Compose/Context; `object` остаётся свободным от Android-зависимостей.                                                       |
+| **Поиск по 4 каналам (символ / keywords ru+en / Unicode-имя / категория)**   | Максимальный охват без ручного описания каждого эмодзи; Unicode-имя — fallback для «забытых» ключевых слов.                                 |
+| **`RecentEmojiRepository` на DataStore**                                     | 20 последних эмодзи переживают перезапуск; `@Singleton` + `Flow` дают реактивное обновление UI без ручного refresh.                         |
+| **`EmojiPickerViewModel` отдельно от `EmojiPickerDialog`**                   | Диалог остаётся переиспользуемым; логика недавних изолирована и не течёт в `CreateTagDialog`.                                               |
+| **Секция «Недавние» рендерится только при непустом списке**                  | Не засоряет UI у нового пользователя; не требует дополнительных условий в родительских экранах.                                             |
+| **`NoteVariant` — отдельная таблица, а не JSON-поле в `Note`**               | Индексы, FK-каскад, отдельный `ownerId` для вложений; не раздуваем `NoteModel` и не парсим JSON в hot path.                                 |
+| **`NotePlatform.MAIN` без записи в `note_variants`**                         | Оригинал живёт в `Note`; версии — только для дополнительных платформ. Единый источник для списков и поиска.                                 |
+| **Unique index `(noteId, platform)`**                                        | «Одна версия на платформу» гарантируется БД, а не кодом.                                                                                    |
+| **Автосохранение при `switchPlatform`**                                      | Пользователь не теряет ввод при переключении вкладок-платформ; меньше «забытых» правок.                                                     |
+| **`OwnerType.NOTE_VARIANT`**                                                 | Переиспользуем `AttachmentFileStore`, `MediaStoreDownloader`, `AttachmentPreviewList`, `FullScreenAttachmentViewer` без изменений.          |
+| **`flatMapLatest` по `activePlatform`**                                      | Единый реактивный поток вложений; UI не знает о двух источниках (Note vs NoteVariant).                                                      |
+| **`MIGRATION_4_5` вместо `fallbackToDestructiveMigration`**                  | Данные пользователя переживают обновление БД; миграции накапливаются, а не сбрасывают.                                                      |
+| **Подсказка «Сохраните заметку…» для новой заметки**                         | Версии требуют `noteId`; UX заранее объясняет, почему чипы скрыты.                                                                          |
+| **Адаптивные лейауты (`NavigationSuiteScaffold`, `ListDetailPaneScaffold`)** | Соответствие гайдлайнам Google для телефонов, планшетов и Chromebook.                                                                       |
+| **M3 Expressive (`Card`, `ListItem`)**                                       | Современный вид без alpha-зависимостей.                                                                                                     |
+| **`@StringRes` в ViewModel**                                                 | Snackbar-сообщения локализуются без утечек `Context`.                                                                                       |
+| **Кастомный `Snackbar` с фурсоной**                                          | Единый стиль уведомлений, брендинг, M3 Expressive (`Surface` + `Box` для выхода за рамки).                                                  |
 
 ## 🚀 Планы по развитию
 
@@ -769,16 +985,13 @@ sequenceDiagram
 - [x] **Просмотр вложений на весь экран** (fullscreen viewer) — `FullScreenAttachmentViewer` (pinch-to-zoom 1×..5×, double-tap 1×↔2.5×, скачивание из fullscreen), `AttachmentPreviewList.onImageClick`.
 - [x] Внедрить **глобальную систему уведомлений** с фурсоной (`AppNotificationManager` + `FursonaSnackbar`).
 - [x] Добавить **пасхалку** и аватар разработчика в настройки.
-- [x] Просмотр вложений на весь экран (fullscreen viewer).
-- [ ] **Мультиверсионные заметки для соцсетей** — несколько версий одной
-  заметки, адаптированных под разные платформы. Возможная реализация:
-  отдельная сущность `NoteVariant` (`noteId`, `platform`, `title`,
-  `content`, `attachments`-override) + `@Relation` в `NoteModel`;
-  переключение версий в `NoteEditScreen` через чипы/таб.
+- [x] **Мультиверсионные заметки для соцсетей** — `NoteVariant` (FK на `Note` с `CASCADE`, unique `(noteId, platform)`), `NotePlatform` (MAIN/TELEGRAM/VK/INSTAGRAM/TWITTER/MASTODON), `OwnerType.NOTE_VARIANT` для вложений, `PlatformSelectorRow` в `NoteEditScreen`, автосохранение при переключении, `MIGRATION_4_5`, БД → version 5.
 - [ ] `ListDetailPaneScaffold` для Notes и Calendar (аналогично Tasks).
-- [ ] `MIGRATION_3_4` для `attachments` (сейчас `fallbackToDestructiveMigration`).
+- [ ] **Порядок и иконки платформ в селекторе** — фиксированный порядок популярных соцсетей, иконки брендов в чипах.
+- [ ] **Экспорт/«Поделиться» выбранной версии** — `Intent.ACTION_SEND` сразу из редактора активной платформы.
+- [ ] **Автоподстановка лимитов** — мягкое предупреждение, если текст версии превышает лимит платформы (например, 4096 для Telegram).
 - [ ] Модуляризация (feature-модули).
-- [ ] Unit-тесты для Use Cases и Repository (включая `AttachmentRepository`, `applyTagFilter`, `TagFilterRepositoryImpl`, `EmojiCatalog.search`, `RecentEmojiRepositoryImpl`).
+- [ ] Unit-тесты для Use Cases и Repository (включая `AttachmentRepository`, `applyTagFilter`, `TagFilterRepositoryImpl`, `EmojiCatalog.search`, `RecentEmojiRepositoryImpl`, `NoteVariantRepositoryImpl`, `NoteEditViewModel.switchPlatform`).
 
 ## 📚 Полезные ссылки
 - [Guide to App Architecture (Google)](https://developer.android.com/topic/architecture)
@@ -788,6 +1001,8 @@ sequenceDiagram
 - [Navigation — type safety](https://developer.android.com/guide/navigation/design/type-safety)
 - [ML Kit Entity Extraction](https://developers.google.com/ml-kit/language/entity-extraction)
 - [Room — Relationships](https://developer.android.com/training/data-storage/room/relationships)
+- [Room — Foreign keys](https://developer.android.com/training/data-storage/room/relationships#foreign-key)
+- [Room — Migrations](https://developer.android.com/training/data-storage/room/migrating-db-versions)
 - [DataStore — Preferences](https://developer.android.com/topic/libraries/architecture/datastore)
 - [Hilt — `@Binds`](https://developer.android.com/training/dependency-injection/hilt-android#hilt-modules)
 - [MediaStore — Download files](https://developer.android.com/training/data-storage/shared/media)

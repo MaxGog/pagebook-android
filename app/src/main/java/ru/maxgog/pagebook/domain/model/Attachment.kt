@@ -2,7 +2,7 @@ package ru.maxgog.pagebook.domain.model
 
 enum class AttachmentType { IMAGE, VIDEO, AUDIO, FILE }
 
-enum class OwnerType { NOTE, TASK, EVENT }
+enum class OwnerType { NOTE, TASK, EVENT, NOTE_VARIANT }
 
 data class Attachment(
     val id: Long = 0,

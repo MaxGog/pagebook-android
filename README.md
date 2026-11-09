@@ -27,6 +27,7 @@ PageBook — это нативное Android-приложение для раб�
 - Адаптивная сетка заметок (StaggeredGrid)
 - **Вложения**: фото из галереи, **снимок с камеры** и файлы через Photo Picker / **`TakePicture`** / `OpenDocument`
 - Превью вложений прямо в редакторе, **fullscreen-просмотр с pinch-to-zoom**, скачивание в `Pictures`/`Downloads`
+- **Мультиверсионные заметки** — несколько адаптаций одной заметки под разные соцсети (Telegram, VK, Instagram, X, Mastodon), каждая со своим текстом, форматированием и **собственными вложениями**
 - Создание задач прямо из заметок с автоматическим извлечением дат
 - **Цветные теги с эмодзи** — палитра из 7 цветов + каталог из 200+ эмодзи
 - **Поиск и недавние эмодзи** в пикере — по символу, ключевым словам (ru/en), Unicode-имени и категории; последние 20 сохраняются в `DataStore`
@@ -62,6 +63,36 @@ PageBook — это нативное Android-приложение для раб�
 - **Надежность**: базируется на `Channel` и `@Singleton` через Hilt (гарантирует доставку ровно один раз).
 - Больше не нужно дублировать `SnackbarHost` на каждом экране — всё управляется из `MainActivity`.
 
+### 📝 Мультиверсионные заметки для соцсетей
+Одна заметка — несколько адаптаций под разные платформы. Сценарий для
+контент-мейкера: написал пост в основной версии → переключился на
+версию для другой соцсети и слегка подправил текст/форматирование/вложения
+под её формат.
+
+**Поддерживаемые платформы**: **Original** (основная, хранится в самой
+заметке), **Telegram**, **VK**, **Instagram**, **X (Twitter)**,
+**Mastodon** — легко расширяется новым значением `NotePlatform`.
+
+**Как это работает**:
+- **`PlatformSelectorRow`** под `TopAppBar` в `NoteEditScreen` — `FilterChip`
+  на каждую версию + `AssistChip` «Add version» с `DropdownMenu` из ещё
+  неиспользованных платформ.
+- **Автосохранение при переключении** — текущая платформа сохраняется
+  перед переходом на новую, ввод не теряется.
+- **Свои вложения** у каждой версии — через `OwnerType.NOTE_VARIANT` +
+  `variantId` в общей `AttachmentEntity` (фото/файлы/камера работают
+  идентично основной версии).
+- **Сохранение только активной платформы** — кнопка ✓ сохраняет то,
+  что открыто сейчас; остальные версии уже сохранены при переключениях.
+- **Удаление версии** — иконка ✕ на чипе; вложения варианта удаляются
+  каскадно. Основную версию удалить нельзя — она живёт в самой `Note`.
+- **Реактивные вложения** — `flatMapLatest` по `activePlatform`;
+  UI не знает о двух источниках (`Note` vs `NoteVariant`).
+- **Уникальность** — unique index `(noteId, platform)` на уровне БД:
+  одна версия на платформу гарантируется БД, а не кодом.
+- Для **новой заметки** селектор скрыт с подсказкой
+  «Сохраните заметку, чтобы добавить версии» — версии требуют `noteId`.
+
 ### 🏷️ Сквозные теги: полный цикл
 Один тег — на заметке, задаче и событии одновременно. Каждый тег можно
 кастомизировать цветом (7 вариантов в стиле macOS) и **эмодзи из каталога
@@ -87,11 +118,12 @@ PageBook — это нативное Android-приложение для раб�
 - В диалоге редактирования показывается **счётчик использования**: `Заметок: N · Задач: N · Событий: N` (3 `COUNT(*)` по junction-таблицам).
 
 ### 📎 Вложения (Attachments)
-Изображения и файлы, прикреплённые к заметкам или задачам. Общая подсистема:
+Изображения и файлы, прикреплённые к заметкам, задачам **и версиям заметок**. Общая подсистема:
 - Файлы хранятся в **app-private storage** (`filesDir/attachments/`).
 - **Photo Picker** (`PickVisualMedia`), **системная камера** (`TakePicture` через `FileProvider`, файл в `cacheDir`) и **`OpenDocument`** для выбора.
 - **Fullscreen-просмотр** изображений с **pinch-to-zoom** (1×..5×) и **double-tap** (1× ↔ 2.5×), скачиванием из просмотра.
 - Превью, удаление и экспорт в `Pictures`/`Downloads` через **MediaStore**.
+- **Полиморфная связь** — `ownerType` (`NOTE`/`TASK`/`EVENT`/`NOTE_VARIANT`) + `ownerId`; один UI-компонент `AttachmentPreviewList` для всех редакторов.
 - Pending-вложения для новых сущностей: файл сохраняется сразу, а `ownerId`
   проставляется после сохранения заметки/задачи.
 - Для `<img>` внутри rich-text — собственный `LocalImageLoader`,
@@ -106,7 +138,8 @@ PageBook — это нативное Android-приложение для раб�
 
 - **💚 100% Kotlin** — Kotlin 2.2.20
 - **🎨 Jetpack Compose** — BOM 2026.09.00, Material 3 Expressive
-- **💾 Room Database** — единая `PageBookDatabase` (8 entities, version 4)
+- **💾 Room Database** — единая `PageBookDatabase` (**9 entities, version 5**)
+- **📝 Note variants** — `NoteVariant` (FK на `Note` c `CASCADE`, unique `(noteId, platform)`), `NotePlatform`, `OwnerType.NOTE_VARIANT`
 - **📎 Attachments** — app-private storage + MediaStore, Photo Picker, **камера (FileProvider)**
 - **📷 Camera** — системная камера через `ActivityResultContracts.TakePicture()` + `FileProvider` (`cacheDir`)
 - **🖼 Fullscreen viewer** — `Dialog` fullscreen + `rememberTransformableState` (pinch/pan/double-tap)
@@ -118,7 +151,7 @@ PageBook — это нативное Android-приложение для раб�
 - **🕘 Recent emojis** — `RecentEmojiRepository` (DataStore, до 20, дедуп) + `EmojiPickerViewModel` (`StateFlow`)
 - **⚙️ DataStore Preferences** — хранение настроек (тема + фильтры тегов + недавние эмодзи)
 - **🌐 AppCompatDelegate** — смена языка (per-app language preferences)
-- **🔄 Coroutines & Flow** — реактивное программирование + `Channel` для one-shot событий
+- **🔄 Coroutines & Flow** — реактивное программирование + `Channel` для one-shot событий; `flatMapLatest` для вложений активной платформы
 - **🧩 Hilt** — внедрение зависимостей (`@Binds` + `@Provides`)
 - **🧭 Navigation Compose** — type-safe навигация + adaptive layouts
 - **🤖 ML Kit Entity Extraction** — извлечение дат из текста заметок
@@ -132,7 +165,7 @@ PageBook — это нативное Android-приложение для раб�
 graph TD
    A[UI Layer<br/>Compose + ViewModel + UiState] --> B[Domain Layer<br/>Use Cases + доменные модели]
    B --> C[Data Layer<br/>Repository Impl + Mappers + Room + DataStore + FileStore]
-   C --> D[(PageBookDatabase - Room<br/>notes, tasks, events, tags, cross-refs, attachments)]
+   C --> D[(PageBookDatabase - Room<br/>notes, note_variants, tasks, events, tags,<br/>cross-refs, attachments)]
    C --> F[(DataStore<br/>theme + tag filters + recent emojis)]
    C --> G[(filesDir/attachments<br/>app-private)]
    C --> G2[(cacheDir<br/>camera temp)]
@@ -142,12 +175,13 @@ graph TD
    A -.->|FilterBadgeIcon| J[Badge count<br/>in TopAppBar]
    A -.->|EmojiPickerViewModel| K[EmojiPickerDialog<br/>search + recent]
    A -.->|FullScreenAttachmentViewer| L[Pinch/Double-tap zoom]
+   A -.->|PlatformSelectorRow| M[NoteVariant<br/>MAIN + Telegram/VK/…]
    C -.-> E[(Remote - Future)]
 ```
 
 ### Clean Architecture
-- **UI Layer**: Jetpack Compose + ViewModel + UiState (sealed interface / data class). Глобальный `Snackbar` управляется из `MainActivity` через `AppNotificationHost`. Состояние фильтра (`TagFilterState`) — часть UiState ViewModel. `EmojiPickerViewModel` изолирует логику недавних эмодзи от `CreateTagDialog`. `FullScreenAttachmentViewer` — переиспользуемый компонент, не требует отдельного экрана.
-- **Domain Layer**: Use Cases, доменные модели (Note, Task, Event, Tag, TagColor, Attachment, TagFilterState, FilterMode, TagUsage), интерфейсы репозиториев (`TagFilterRepository`, `RecentEmojiRepository`), `applyTagFilter` (общая утилита).
+- **UI Layer**: Jetpack Compose + ViewModel + UiState (sealed interface / data class). Глобальный `Snackbar` управляется из `MainActivity` через `AppNotificationHost`. Состояние фильтра (`TagFilterState`) — часть UiState ViewModel. `EmojiPickerViewModel` изолирует логику недавних эмодзи от `CreateTagDialog`. `FullScreenAttachmentViewer` — переиспользуемый компонент, не требует отдельного экрана. `PlatformSelectorRow` внутри `NoteEditScreen` переключает `activePlatform` и реактивно меняет содержимое редактора и вложений.
+- **Domain Layer**: Use Cases, доменные модели (`Note`, `Task`, `Event`, `Tag`, `TagColor`, `Attachment`, **`NoteVariant`, `NotePlatform`**, `TagFilterState`, `FilterMode`, `TagUsage`), интерфейсы репозиториев (`TagFilterRepository`, `RecentEmojiRepository`, **`NoteVariantRepository`**), `applyTagFilter` (общая утилита).
 - **Data Layer**: Room, DAO, мапперы, реализации репозиториев, DataStore (`SettingsRepository`, `TagFilterRepositoryImpl`, `RecentEmojiRepositoryImpl`), файловое хранилище (`AttachmentFileStore`, `MediaStoreDownloader`), Hilt-модули.
 - **Core Layer**: `AppNotificationManager` (синглтон для событий UI).
 
@@ -157,6 +191,9 @@ graph TD
 Вложения — полиморфная связь (`ownerType` + `ownerId`) через общую таблицу,
 плюс **камера как источник** и **fullscreen-viewer** с зумом.
 Эмодзи-пикер — отдельный переиспользуемый компонент с **поиском** (4 канала) и **недавними** (DataStore).
+**Мультиверсионные заметки** — отдельная сущность `NoteVariant` с FK-каскадом
+на `Note`, unique `(noteId, platform)` и собственными вложениями через
+`OwnerType.NOTE_VARIANT`.
 
 Подробнее см. в [ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -191,27 +228,36 @@ app/src/main/java/ru/maxgog/pagebook/
 ├── core/
 │   └── notification/   # AppNotification, AppNotificationManager, AppNotificationType
 ├── data/
-│   ├── dao/            # NoteDao, TaskDao, EventDao, TagDao (+ TagUsageRow)
+│   ├── dao/            # NoteDao, TaskDao, EventDao, TagDao (+ TagUsageRow),
+│   │                   #   NoteVariantDao
 │   ├── local/          # AttachmentDao, AttachmentEntity
 │   ├── models/         # Room-сущности (@Entity) + *WithTags (@Relation)
-│   ├── rooms/          # PageBookDatabase (единая БД, version 4) + Migrations
+│   │                   #   + NoteVariantModel
+│   ├── rooms/          # PageBookDatabase (единая БД, version 5) + Migrations
+│   │                   #   (MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
 │   ├── file/           # AttachmentFileStore, MediaStoreDownloader
 │   ├── mapper/         # NoteMapper, TaskMapper, EventMapper, TagMapper,
-│   │                   #   AttachmentMapper
+│   │                   #   AttachmentMapper, NoteVariantMapper
 │   ├── repository/     # *RepositoryImpl, SettingsRepository,
 │   │                   #   TagFilterRepositoryImpl (DataStore),
-│   │                   #   RecentEmojiRepositoryImpl (DataStore)
-│   └── di/             # DatabaseModule, RepositoryModule, DataStoreModule,
-│                       #   AttachmentsModule
+│   │                   #   RecentEmojiRepositoryImpl (DataStore),
+│   │                   #   NoteVariantRepositoryImpl
+│   └── di/             # DatabaseModule (+ provideNoteVariantDao),
+│                       #   RepositoryModule (+ @Binds NoteVariantRepository),
+│                       #   DataStoreModule, AttachmentsModule
 ├── domain/
 │   ├── model/          # Note, Task, Event, Tag, TagColor,
-│   │                   #   Attachment, AttachmentType, OwnerType,
+│   │                   #   Attachment, AttachmentType, OwnerType (NOTE/TASK/EVENT/NOTE_VARIANT),
+│   │                   #   NoteVariant, NotePlatform (MAIN/TELEGRAM/VK/INSTAGRAM/TWITTER/MASTODON),
 │   │                   #   TagFilterState, FilterMode, TagFilterModule, TagUsage
 │   ├── repository/     # NoteRepository, TaskRepository, EventRepository,
 │   │                   #   TagRepository, TagFilterRepository,
-│   │                   #   RecentEmojiRepository, AttachmentRepository (интерфейсы)
+│   │                   #   RecentEmojiRepository, AttachmentRepository,
+│   │                   #   NoteVariantRepository (интерфейсы)
 │   ├── usecase/
-│   │   ├── note/       # GetAllNotesUseCase, SaveNoteUseCase, ...
+│   │   ├── note/       # GetAllNotesUseCase, SaveNoteUseCase,
+│   │   │               #   GetVariantsForNoteUseCase, SaveNoteVariantUseCase,
+│   │   │               #   DeleteNoteVariantUseCase, ...
 │   │   ├── task/       # GetAllTasksUseCase, SaveTaskUseCase,
 │   │   │               #   GetTaskByIdUseCase, CreateTaskFromNoteUseCase, ...
 │   │   ├── event/      # GetAllEventsUseCase, SaveEventUseCase, ...
@@ -239,7 +285,8 @@ app/src/main/java/ru/maxgog/pagebook/
 │   │                   #   CameraPicker (TakePicture + FileProvider),
 │   │                   #   FullScreenAttachmentViewer (pinch/double-tap zoom),
 │   │                   #   ResizeImageDialog
-│   ├── notes/          # NotesScreen, NoteEditScreen + ViewModels + UiStates + NoteItem
+│   ├── notes/          # NotesScreen, NoteEditScreen (+PlatformSelectorRow,
+│   │                   #   NotePlatform.labelRes) + ViewModels + UiStates + NoteItem
 │   ├── tasks/          # TaskListScreen, TaskEditScreen, TaskItem,
 │   │                   #   TaskListDetailPane + ViewModels + UiStates
 │   ├── calendar/       # CalendarScreen, AddEventDialog, DateTimePickerDialog,
@@ -258,17 +305,56 @@ app/src/main/res/xml/
 
 ## 🧩 Функциональные возможности
 
-| Модуль               | Возможности                                                                                                                                       | Технологии                                     |
-|----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------|
-| **Notes** 📝         | Rich-text заметки, адаптивная сетка, ML Kit для извлечения дат, **теги с эмодзи**, **фильтрация по тегам (OR/AND, persist, badge)**, **вложения (галерея + камера + файлы)**, **fullscreen-viewer** | Compose, Room, RichEditor, ML Kit, PhotoPicker, TakePicture |
-| **Tasks** ✅         | Задачи с напоминаниями, связь с заметками (`noteId`), сортировка, **теги с эмодзи**, **фильтрация по тегам**, **вложения (галерея + камера + файлы)**, **fullscreen-viewer** | Compose, StateFlow, Room                       |
-| **Calendar** 🗓️      | События по датам, реактивное обновление, автоскролл, **теги с эмодзи**, **фильтрация (список + точки на днях)**                                   | Compose, kizitonwose Calendar, Room            |
-| **Settings** ⚙️      | Тема (System/Light/Dark), язык (ru/en), **пасхалка с фурсоной**, **аватар разработчика**                                                          | Compose, DataStore, AppCompat                  |
-| **Notifications** 🔔 | Глобальные уведомления (SUCCESS/ERROR/INFO/EASTER_EGG) с аватаром-фурсоной, выходящим за края `Snackbar`                                          | Compose, Channel, Hilt                         |
-| **Tags** 🏷️          | Сквозные теги: 7 цветов macOS + **200+ эмодзи**, **фильтр OR/AND + persist + badge**, **редактирование**, **счётчик использования**               | Room (@Relation + @Junction), Hilt, FilterChip |
-| **Emoji picker** 🔎  | Каталог 200+ эмодзи в 10 категориях, **поиск** (символ / keywords ru+en / Unicode-имя / категория), **недавние** (20, DataStore)                   | Compose, DataStore, Hilt, `Character.getName`  |
-| **Attachments** 📎   | App-private storage + MediaStore, Photo Picker + **TakePicture (FileProvider)**, **fullscreen-viewer с pinch/double-tap**, `@Update` для pending, `<img>` в rich-text | Room, ContentResolver, FileProvider, LocalImageLoader |
-| **Camera** 📷        | Системная камера через `TakePicture` + `FileProvider` (cacheDir), без `CAMERA`-permission                                                          | ActivityResultContracts, FileProvider          |
+| Модуль               | Возможности                                                                                                                                                                                                                                    | Технологии                                                  |
+|----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------|
+| **Notes** 📝         | Rich-text заметки, адаптивная сетка, ML Kit для извлечения дат, **теги с эмодзи**, **фильтрация по тегам (OR/AND, persist, badge)**, **вложения (галерея + камера + файлы)**, **fullscreen-viewer**, **мультиверсионные заметки для соцсетей** | Compose, Room, RichEditor, ML Kit, PhotoPicker, TakePicture |
+| **Note variants** 🔀 | **Версии одной заметки под соцсети** — `NoteVariant` (FK, CASCADE, unique `(noteId, platform)`), `PlatformSelectorRow`, автосохранение при переключении, **свои вложения** через `OwnerType.NOTE_VARIANT`                                      | Room, Compose, Hilt, Flow (`flatMapLatest`)                 |
+| **Tasks** ✅         | Задачи с напоминаниями, связь с заметками (`noteId`), сортировка, **теги с эмодзи**, **фильтрация по тегам**, **вложения (галерея + камера + файлы)**, **fullscreen-viewer**                                                                   | Compose, StateFlow, Room                                    |
+| **Calendar** 🗓️      | События по датам, реактивное обновление, автоскролл, **теги с эмодзи**, **фильтрация (список + точки на днях)**                                                                                                                                | Compose, kizitonwose Calendar, Room                         |
+| **Settings** ⚙️      | Тема (System/Light/Dark), язык (ru/en), **пасхалка с фурсоной**, **аватар разработчика**                                                                                                                                                       | Compose, DataStore, AppCompat                               |
+| **Notifications** 🔔 | Глобальные уведомления (SUCCESS/ERROR/INFO/EASTER_EGG) с аватаром-фурсоной, выходящим за края `Snackbar`                                                                                                                                       | Compose, Channel, Hilt                                      |
+| **Tags** 🏷️          | Сквозные теги: 7 цветов macOS + **200+ эмодзи**, **фильтр OR/AND + persist + badge**, **редактирование**, **счётчик использования**                                                                                                            | Room (@Relation + @Junction), Hilt, FilterChip              |
+| **Emoji picker** 🔎  | Каталог 200+ эмодзи в 10 категориях, **поиск** (символ / keywords ru+en / Unicode-имя / категория), **недавние** (20, DataStore)                                                                                                               | Compose, DataStore, Hilt, `Character.getName`               |
+| **Attachments** 📎   | App-private storage + MediaStore, Photo Picker + **TakePicture (FileProvider)**, **fullscreen-viewer с pinch/double-tap**, `@Update` для pending, `<img>` в rich-text, **владельцы: NOTE / TASK / EVENT / NOTE_VARIANT**                       | Room, ContentResolver, FileProvider, LocalImageLoader       |
+| **Camera** 📷        | Системная камера через `TakePicture` + `FileProvider` (cacheDir), без `CAMERA`-permission                                                                                                                                                      | ActivityResultContracts, FileProvider                       |
+
+## 📝 Мультиверсионные заметки для соцсетей
+
+### Как пользоваться
+1. Откройте сохранённую заметку в редакторе.
+2. Под `TopAppBar` появится **`PlatformSelectorRow`** — чип **Original**
+   и кнопка **«Add version»**.
+3. Тап по «Add version» → выбор платформы (**Telegram / VK / Instagram /
+   X (Twitter) / Mastodon**) → создаётся пустая версия, редактор
+   переключается на неё.
+4. Пишете пост, при необходимости прикрепляете **отдельные вложения** —
+   они не влияют на основную версию.
+5. Переключение чипа → текущая платформа **автосохраняется**;
+   редактор перерисовывается на выбранную.
+6. **✓** сохраняет активную платформу и возвращает назад.
+
+### Что внутри
+- **Domain**: `NoteVariant` (`id`, `noteId`, `platform`, `title`, `content`,
+  `createdAt`), `NotePlatform` (`MAIN` — оригинал без записи в таблицу).
+- **Data**: `NoteVariantModel` (`@Entity`), `NoteVariantDao`,
+  `NoteVariantMapper`, `NoteVariantRepository(Impl)`.
+- **`MIGRATION_4_5`** — создаёт `note_variants` c FK `CASCADE`,
+  `Index("noteId")`, **unique** `Index("(noteId, platform)")`;
+  подключена в `DatabaseModule` (`fallbackToDestructiveMigration` убран —
+  данные пользователей сохраняются).
+- **`OwnerType.NOTE_VARIANT`** — вложения версий живут в той же
+  `attachments` таблице; `AttachmentFileStore`, `MediaStoreDownloader`,
+  `AttachmentPreviewList`, `FullScreenAttachmentViewer` работают без
+  изменений.
+- **`flatMapLatest`** по `activePlatform to variants` — единый реактивный
+  поток вложений; UI не знает, что вложений два источника.
+
+### Ограничения v1
+- Для **новой** заметки селектор скрыт с подсказкой «Сохраните заметку,
+  чтобы добавить версии» — версии требуют `noteId`. После сохранения и
+  повторного открытия — доступны.
+- Экспорт/«Поделиться» активной версии — в roadmap.
+- Автоподстановка лимитов длины текста для платформы — в roadmap.
 
 ## 🏷️ Фильтрация по тегам
 
@@ -376,7 +462,7 @@ app/src/main/res/xml/
 - [x] **Type-safe navigation** через `@Serializable` destinations
 - [x] **Hilt** для внедрения зависимостей (`@Binds` + `@Provides`)
 - [x] **ML Kit** для извлечения дат из заметок
-- [x] **Единая PageBookDatabase** с `ForeignKey` между сущностями
+- [x] **Единая PageBookDatabase** с `ForeignKey` между сущностями (version 5, 9 entities)
 - [x] **Сквозные теги** (7 цветов, many-to-many) во всех модулях
 - [x] **DataStore** для настроек (тема)
 - [x] **Эмодзи-кастомизация тегов** (200+ эмодзи в 10 категориях)
@@ -399,24 +485,24 @@ app/src/main/res/xml/
 - [x] **Глобальная система уведомлений** (кастомный `Snackbar` с фурсоной)
 - [x] **Пасхалка** (7 тапов по версии) и аватар разработчика в настройках
 - [x] **Смена языка на Android < 13** (требуется `AppCompatActivity`)
-- [ ] **Мультиверсионные заметки для соцсетей** — одна заметка с несколькими
-  «адаптациями» под разные платформы. Сценарий для художника: написал
-  пост в заметке → переключился на версию для другой соцсети и слегка
-  подправил текст/форматирование/вложения под её формат.
+- [x] **Мультиверсионные заметки для соцсетей** — `NoteVariant` (FK на `Note` с `CASCADE`, unique `(noteId, platform)`), `NotePlatform` (MAIN/Telegram/VK/Instagram/X/Mastodon), `OwnerType.NOTE_VARIANT` для вложений, `PlatformSelectorRow` в `NoteEditScreen`, автосохранение при переключении, `MIGRATION_4_5`, БД → version 5
+- [ ] **Порядок и иконки платформ в селекторе** — фиксированный порядок популярных соцсетей, иконки брендов в чипах
+- [ ] **Экспорт/«Поделиться» выбранной версии** — `Intent.ACTION_SEND` из редактора активной платформы
+- [ ] **Автоподстановка лимитов** — мягкое предупреждение, если текст версии превышает лимит платформы (например, 4096 для Telegram)
+- [ ] **Копирование оригинала в новую версию** — при создании версии опционально заполнять из `MAIN`
 - [ ] **`ListDetailPaneScaffold` для Notes и Calendar** (аналогично Tasks)
-- [ ] **`MIGRATION_3_4`** для `attachments` (сейчас `fallbackToDestructiveMigration`)
 - [ ] **Синхронизация с облаком** ☁️
 - [ ] **Виджеты для главного экрана** 🏠
 - [ ] **Резервное копирование** 💾
 - [ ] **Голосовые заметки** 🎤
 - [ ] **Модуляризация** (feature-модули)
-- [ ] **Unit-тесты** для Use Cases и Repository (включая `AttachmentRepository`, `applyTagFilter`, `TagFilterRepositoryImpl`, `EmojiCatalog.search`, `RecentEmojiRepositoryImpl`)
+- [ ] **Unit-тесты** для Use Cases и Repository (включая `AttachmentRepository`, `applyTagFilter`, `TagFilterRepositoryImpl`, `EmojiCatalog.search`, `RecentEmojiRepositoryImpl`, `NoteVariantRepositoryImpl`, `NoteEditViewModel.switchPlatform/deleteVariant`)
 - [ ] **WorkManager** для напоминаний о задачах
 - [ ] **Kotlin Multiplatform** для общей бизнес-логики
 
 ## 📄 Лицензия
 
-Этот проект распространяется под лицензией **GNU Affero General Public License v3.0 (AGPL-3.0)**. Подробнее см. в файле [GNU AFFERO GENERAL PUBLIC.txt](GNU%20AFFERO%20GENERAL%20PUBLIC.txt) или на [официальном сайте FSF](https://www.gnu.org/licenses/agpl-3.0.html).
+Этот проект распространяется под лицензией **GNU Affero General Public License v3.0 (AGPL-3.0)**. Подробнее см. в файле [LICENSE](LICENSE) или на [официальном сайте FSF](https://www.gnu.org/licenses/agpl-3.0.html).
 
 ## 👨‍💻 Автор
 

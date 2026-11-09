@@ -168,4 +168,17 @@
     <string name="close">Close</string>
     <string name="download">Download</string>
     <string name="attachment_load_error">Failed to load image</string>
+
+    <string name="platform_main">Original</string>
+    <string name="platform_telegram">Telegram</string>
+    <string name="platform_vk">VK</string>
+    <string name="platform_instagram">Instagram</string>
+    <string name="platform_twitter">X (Twitter)</string>
+    <string name="platform_mastodon">Mastodon</string>
+    <string name="platform_bluesky">Bluesky</string>
+    <string name="platform_facebook">Facebook</string>
+    <string name="platform_other">Other</string>
+    <string name="add_platform_version">Add version</string>
+    <string name="save_note_first">Save the note first to add versions</string>
+    <string name="version_deleted">Version deleted</string>
 </resources>

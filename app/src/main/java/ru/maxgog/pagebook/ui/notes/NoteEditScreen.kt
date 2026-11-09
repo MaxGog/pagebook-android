@@ -1,6 +1,7 @@
 package ru.maxgog.pagebook.ui.notes
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
@@ -11,7 +12,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontStyle
@@ -28,6 +28,8 @@ import com.mohamedrejeb.richeditor.model.rememberRichTextState
 import com.mohamedrejeb.richeditor.ui.material3.RichTextEditor
 import ru.maxgog.pagebook.R
 import ru.maxgog.pagebook.domain.model.Attachment
+import ru.maxgog.pagebook.domain.model.NotePlatform
+import ru.maxgog.pagebook.domain.model.NoteVariant
 import ru.maxgog.pagebook.domain.model.Tag
 import ru.maxgog.pagebook.ui.components.AttachmentImageLoader
 import ru.maxgog.pagebook.ui.components.AttachmentPreviewList
@@ -39,7 +41,11 @@ import ru.maxgog.pagebook.ui.components.rememberCameraPicker
 import ru.maxgog.pagebook.ui.components.rememberFilePicker
 import ru.maxgog.pagebook.ui.components.rememberPhotoPicker
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalRichTextApi::class)
+@OptIn(
+    ExperimentalMaterial3Api::class,
+    ExperimentalLayoutApi::class,
+    ExperimentalRichTextApi::class
+)
 @Composable
 fun NoteEditScreen(
     onBack: () -> Unit,
@@ -52,9 +58,6 @@ fun NoteEditScreen(
 
     val pickImage = rememberPhotoPicker { uri -> viewModel.attachUri(uri) }
     val pickFile = rememberFilePicker { uri -> viewModel.attachUri(uri) }
-    val pickCamera = rememberCameraPicker(
-        onPicked = { uri -> viewModel.attachUri(uri) }
-    )
 
     var showTagPicker by remember { mutableStateOf(false) }
     var showCreateTag by remember { mutableStateOf(false) }
@@ -62,7 +65,12 @@ fun NoteEditScreen(
     var showMoreMenu by remember { mutableStateOf(false) }
     var viewingAttachment by remember { mutableStateOf<Attachment?>(null) }
 
-    val currentNote = (uiState as? NoteEditUiState.Editing)?.note
+    val editing = uiState as? NoteEditUiState.Editing
+    val newNote = uiState as? NoteEditUiState.NewNote
+    val activePlatform = editing?.activePlatform ?: NotePlatform.MAIN
+    val currentVariant = editing?.variants?.find { it.platform == activePlatform }
+    val currentNote = editing?.note
+
     val currentTags = when (val s = uiState) {
         is NoteEditUiState.Editing -> s.tags
         is NoteEditUiState.NewNote -> s.selectedTags
@@ -74,13 +82,20 @@ fun NoteEditScreen(
         else -> emptyList()
     }
     val isLoading = uiState is NoteEditUiState.Loading
-    val isNewNote = uiState is NoteEditUiState.NewNote
+    val isNewNote = newNote != null
     val canCreateTask = currentNote != null && !taskCreating
 
-    var titleState by remember(currentNote?.id) { mutableStateOf(currentNote?.title ?: "") }
+    var titleState by remember(activePlatform, editing?.note?.id) {
+        mutableStateOf(
+            if (activePlatform == NotePlatform.MAIN) editing?.note?.title.orEmpty()
+            else currentVariant?.title.orEmpty()
+        )
+    }
 
-    LaunchedEffect(currentNote?.id) {
-        currentNote?.let { richTextState.setHtml(it.content) }
+    LaunchedEffect(activePlatform, editing?.note?.id) {
+        val html = if (activePlatform == NotePlatform.MAIN) editing?.note?.content.orEmpty()
+        else currentVariant?.content.orEmpty()
+        richTextState.setHtml(html)
     }
 
     LaunchedEffect(Unit) {
@@ -100,9 +115,14 @@ fun NoteEditScreen(
             topBar = {
                 TopAppBar(
                     title = {
+                        val titleText = when {
+                            newNote != null -> stringResource(R.string.new_note)
+                            activePlatform != NotePlatform.MAIN -> stringResource(R.string.edit_note) +
+                                    " · " + stringResource(activePlatform.labelRes())
+                            else -> stringResource(R.string.edit_note)
+                        }
                         Text(
-                            text = if (isNewNote) stringResource(R.string.new_note)
-                            else stringResource(R.string.edit_note),
+                            text = titleText,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -166,13 +186,6 @@ fun NoteEditScreen(
                                     onClick = { showMoreMenu = false; pickFile() },
                                     leadingIcon = {
                                         Icon(Icons.Default.AttachFile, contentDescription = null)
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.take_photo)) },
-                                    onClick = { showMoreMenu = false; pickCamera() },
-                                    leadingIcon = {
-                                        Icon(Icons.Default.PhotoCamera, contentDescription = null)
                                     }
                                 )
                                 if (currentNote != null) {
@@ -252,6 +265,38 @@ fun NoteEditScreen(
                         .padding(padding)
                         .padding(horizontal = 16.dp)
                 ) {
+                    if (editing != null) {
+                        PlatformSelectorRow(
+                            activePlatform = activePlatform,
+                            variants = editing.variants,
+                            onSelect = { p ->
+                                if (p != activePlatform) {
+                                    viewModel.switchPlatform(
+                                        p,
+                                        titleState,
+                                        richTextState.toHtml()
+                                    )
+                                }
+                            },
+                            onAdd = { p ->
+                                viewModel.switchPlatform(
+                                    p,
+                                    titleState,
+                                    richTextState.toHtml()
+                                )
+                            },
+                            onDelete = viewModel::deleteVariant,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    } else if (newNote != null) {
+                        Text(
+                            text = stringResource(R.string.save_note_first),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+
                     BasicTextField(
                         value = titleState,
                         onValueChange = { titleState = it },
@@ -384,6 +429,89 @@ fun NoteEditScreen(
             onDownload = { viewModel.downloadAttachment(attachment) }
         )
     }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PlatformSelectorRow(
+    activePlatform: NotePlatform,
+    variants: List<NoteVariant>,
+    onSelect: (NotePlatform) -> Unit,
+    onAdd: (NotePlatform) -> Unit,
+    onDelete: (NotePlatform) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var showAddMenu by remember { mutableStateOf(false) }
+    val available = NotePlatform.entries.filter { p ->
+        p != NotePlatform.MAIN && variants.none { it.platform == p }
+    }
+
+    FlowRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        FilterChip(
+            selected = activePlatform == NotePlatform.MAIN,
+            onClick = { onSelect(NotePlatform.MAIN) },
+            label = { Text(stringResource(NotePlatform.MAIN.labelRes())) }
+        )
+        variants.forEach { variant ->
+            FilterChip(
+                selected = activePlatform == variant.platform,
+                onClick = { onSelect(variant.platform) },
+                label = { Text(stringResource(variant.platform.labelRes())) },
+                trailingIcon = {
+                    IconButton(
+                        onClick = { onDelete(variant.platform) },
+                        modifier = Modifier.size(20.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+            )
+        }
+        if (available.isNotEmpty()) {
+            Box {
+                AssistChip(
+                    onClick = { showAddMenu = true },
+                    label = { Text(stringResource(R.string.add_platform_version)) },
+                    leadingIcon = { Icon(Icons.Default.Add, contentDescription = null) }
+                )
+                DropdownMenu(
+                    expanded = showAddMenu,
+                    onDismissRequest = { showAddMenu = false }
+                ) {
+                    available.forEach { platform ->
+                        DropdownMenuItem(
+                            text = { Text(stringResource(platform.labelRes())) },
+                            onClick = {
+                                showAddMenu = false
+                                onAdd(platform)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun NotePlatform.labelRes(): Int = when (this) {
+    NotePlatform.MAIN -> R.string.platform_main
+    NotePlatform.TELEGRAM -> R.string.platform_telegram
+    NotePlatform.VK -> R.string.platform_vk
+    NotePlatform.INSTAGRAM -> R.string.platform_instagram
+    NotePlatform.TWITTER -> R.string.platform_twitter
+    NotePlatform.MASTODON -> R.string.platform_mastodon
+    NotePlatform.BLUESKY -> R.string.platform_bluesky
+    NotePlatform.FACEBOOK -> R.string.platform_facebook
+    NotePlatform.OTHER -> R.string.platform_other
 }
 
 @Composable

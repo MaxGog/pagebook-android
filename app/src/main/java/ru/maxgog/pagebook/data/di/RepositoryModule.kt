@@ -6,12 +6,14 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import ru.maxgog.pagebook.data.repository.EventRepositoryImpl
 import ru.maxgog.pagebook.data.repository.NoteRepositoryImpl
+import ru.maxgog.pagebook.data.repository.NoteVariantRepositoryImpl
 import ru.maxgog.pagebook.data.repository.RecentEmojiRepositoryImpl
 import ru.maxgog.pagebook.data.repository.TagFilterRepositoryImpl
-import ru.maxgog.pagebook.data.repository.TaskRepositoryImpl
 import ru.maxgog.pagebook.data.repository.TagRepositoryImpl
+import ru.maxgog.pagebook.data.repository.TaskRepositoryImpl
 import ru.maxgog.pagebook.domain.repository.EventRepository
 import ru.maxgog.pagebook.domain.repository.NoteRepository
+import ru.maxgog.pagebook.domain.repository.NoteVariantRepository
 import ru.maxgog.pagebook.domain.repository.RecentEmojiRepository
 import ru.maxgog.pagebook.domain.repository.TagFilterRepository
 import ru.maxgog.pagebook.domain.repository.TagRepository
@@ -22,27 +24,24 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
 
-    @Binds
-    @Singleton
-    abstract fun bindEventRepository(impl: EventRepositoryImpl): EventRepository
-
-    @Binds
-    @Singleton
+    @Binds @Singleton
     abstract fun bindNoteRepository(impl: NoteRepositoryImpl): NoteRepository
 
-    @Binds
-    @Singleton
+    @Binds @Singleton
     abstract fun bindTaskRepository(impl: TaskRepositoryImpl): TaskRepository
 
-    @Binds
-    @Singleton
+    @Binds @Singleton
+    abstract fun bindEventRepository(impl: EventRepositoryImpl): EventRepository
+
+    @Binds @Singleton
     abstract fun bindTagRepository(impl: TagRepositoryImpl): TagRepository
 
-    @Binds
-    @Singleton
+    @Binds @Singleton
     abstract fun bindTagFilterRepository(impl: TagFilterRepositoryImpl): TagFilterRepository
 
-    @Binds
-    @Singleton
+    @Binds @Singleton
     abstract fun bindRecentEmojiRepository(impl: RecentEmojiRepositoryImpl): RecentEmojiRepository
+
+    @Binds @Singleton
+    abstract fun bindNoteVariantRepository(impl: NoteVariantRepositoryImpl): NoteVariantRepository
 }
