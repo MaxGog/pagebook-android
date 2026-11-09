@@ -5,15 +5,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -33,24 +28,20 @@ import ru.maxgog.pagebook.core.notification.AppNotificationType
 fun FursonaSnackbar(
     message: String,
     type: AppNotificationType,
-    modifier: Modifier = Modifier,
-    withDismissAction: Boolean = true,
-    onDismiss: () -> Unit = {}
+    modifier: Modifier = Modifier
 ) {
     val containerColor = type.containerColor()
     val contentColor = type.contentColor()
     val accentColor = type.accentColor()
 
-    // Используем Box, чтобы картинка могла выходить за пределы Surface
     Box(
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center
     ) {
-        // --- ФОН СНЕКБАРА ---
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                // Отступаем слева, чтобы освободить место для фурсоны
-                .padding(start = 80.dp, top = 16.dp, end = 16.dp, bottom = 16.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             shape = MaterialTheme.shapes.extraLarge,
             color = containerColor,
             contentColor = contentColor,
@@ -59,8 +50,7 @@ fun FursonaSnackbar(
             border = BorderStroke(1.dp, accentColor.copy(alpha = 0.25f))
         ) {
             Row(
-                // Внутренний отступ текста, чтобы он не наезжал на картинку
-                modifier = Modifier.padding(start = 72.dp, top = 16.dp, bottom = 16.dp, end = 16.dp),
+                modifier = Modifier.padding(start = 120.dp, top = 16.dp, bottom = 16.dp, end = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -69,34 +59,18 @@ fun FursonaSnackbar(
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.weight(1f)
+                        .offset(x = 12.dp)
                 )
-
-                if (withDismissAction) {
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = stringResource(R.string.notification_dismiss),
-                            tint = contentColor.copy(alpha = 0.7f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
             }
         }
 
-        // --- ФУРСОНА (выглядывает слева снизу) ---
         Image(
             painter = painterResource(R.drawable.ic_fursona_avatar),
             contentDescription = stringResource(R.string.fursona_avatar_content_description),
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                // Сдвигаем вниз (y = 8.dp), чтобы она перекрывала нижнюю границу
-                .offset(x = 0.dp, y = 8.dp)
-                // Размер должен быть больше высоты снекбара
-                .size(130.dp),
+                .offset(x = 8.dp, y = (-56).dp)
+                .size(160.dp),
             contentScale = ContentScale.Fit
         )
     }

@@ -83,8 +83,6 @@ class MainActivity : AppCompatActivity() {
                             message = visuals.message,
                             type = (visuals as? FursonaSnackbarVisuals)?.type
                                 ?: AppNotificationType.INFO,
-                            withDismissAction = visuals.withDismissAction,
-                            onDismiss = { data.dismiss() }
                         )
                     }
                 }
